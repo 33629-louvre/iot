@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบลงทะเบียนและผูกข้อมูลผู้ป่วย - GPS Tracker</title>
+
+  <!-- Leaflet & Geoman -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Prompt', 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    body {
+      background: #f4f7f9;
+      color: #202124;
+      padding-bottom: 40px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1a73e8, #0d47a1);
+      color: white;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(26, 115, 232, 0.2);
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .container {
+      max-width: 650px;
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a73e8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #edf2f7;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+    }
+
+    /* Toggle Switch */
+    .switch-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+    }
+
+    .switch-info h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .switch-info p {
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e0;
+      transition: .3s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked+.slider {
+      background-color: #1a73e8;
+    }
+
+    input:checked+.slider:before {
+      transform: translateX(22px);
+    }
+
+    /* Map Box */
+    #map {
+      width: 100%;
+      height: 280px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      margin-top: 8px;
+    }
+
+    /* Caregiver List */
+    .caregiver-item {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .btn-remove {
+      background: #fed7d7;
+      color: #c53030;
+      border: none;
+      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .btn-add {
+      background: #edf2f7;
+      color: #2b6cb0;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Action Button */
+    .btn-submit {
+      width: 100%;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+      transition: all 0.2s;
+    }
+
+    .btn-submit:hover {
+      background: #1557b0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <h1>📋 ผูกข้อมูลผู้ป่วยและเครื่อง GPS</h1>
+    <p>ระบบบันทึกความสัมพันธ์ระหว่าง ผู้ป่วย • เครื่อง GPS • ผู้ดูแล • Buzzer • แนวรั้วบ้าน</p>
+  </div>
+
+  <div class="container">
+
+    <!-- 1. ข้อมูลผู้ป่วยและเครื่อง -->
+    <div class="card">
+      <div class="section-title">👤 ข้อมูลผู้สวมใส่และเครื่องติดตาม</div>
+
+      <div class="form-group">
+        <label>รหัสเครื่องติดตาม (Device ID):</label>
+        <input type="text" id="deviceId" value="TRACKER_01" placeholder="เช่น TRACKER_01, GPS-02">
+      </div>
+
+      <div class="form-group">
+        <label>ชื่อผู้ป่วย / ผู้สวมใส่:</label>
+        <input type="text" id="patientName" value="คุณตาสมชาย" placeholder="เช่น คุณตาสมชาย, คุณยายสมศรี">
+      </div>
+
+      <div class="form-group">
+        <label>หมายเหตุ / อาการประจำตัว:</label>
+        <input type="text" id="patientNote" value="ผู้ป่วยอัลไซเมอร์ สวมสายรัดแขนข้อมือซ้าย"
+          placeholder="เช่น ความจำเสื่อม, เดินเร็ว">
+      </div>
+    </div>
+
+    <!-- 2. การตั้งค่าเสียงเตือน Buzzer -->
+    <div class="card">
+      <div class="section-title">🔊 การตั้งค่าสายรัดแขน (Buzzer)</div>
+
+      <div class="switch-container">
+        <div class="switch-info">
+          <h4>เปิดเสียงเตือน Buzzer ที่สายรัดแขน</h4>
+          <p>ส่งเสียงบี๊บเตือนเมื่อผู้ป่วยก้าวออกนอกเขตบ้าน</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="buzzerSwitch" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 3. รายชื่อผู้ดูแล (ส่งเข้าหลายคนพร้อมกัน) -->
+    <div class="card">
+      <div class="section-title">👥 ผู้ดูแลที่รับการแจ้งเตือนใน LINE</div>
+
+      <div id="caregiversList">
+        <div class="caregiver-item">
+          <input type="text" placeholder="ชื่อผู้ดูแล" value="ลูกสาว (ผู้ดูแลหลัก)" style="flex: 2;">
+          <input type="text" placeholder="User ID (U...)" value="U1664630158334b37fcdac10318ee0d4e" style="flex: 3;">
+        </div>
+        <div class="caregiver-item">
+          <input type="text" placeholder="ชื่อผู้ดูแล" value="ลูกชาย (ผู้ดูแลสำรอง)" style="flex: 2;">
+          <input type="text" placeholder="User ID (U...)" value="U8af540fcc48dcc553f87d88aed55bab4" style="flex: 3;">
+        </div>
+      </div>
+
+      <button type="button" class="btn-add" onclick="addCaregiverField()">➕ เพิ่มผู้ดูแลอีกคน</button>
+    </div>
+
+    <!-- 4. แนวรั้วบ้านประจำตัวผู้ป่วยคนนี้ -->
+    <div class="card">
+      <div class="section-title">🏡 แนวรั้วบ้านเฉพาะของผู้ป่วยคนนี้</div>
+      <p style="font-size: 12px; color: #718096; margin-bottom: 8px;">
+        ใช้นิ้วหรือเมาส์จิ้มปรับเสารั้วตามแนวที่ดินจริงของบ้านผู้ป่วยคนนี้
+      </p>
+
+      <div id="map"></div>
+    </div>
+
+    <!-- ปุ่มบันทึก -->
+    <button class="btn-submit" onclick="saveAllBindingData()">💾 บันทึกและผูกข้อมูลทั้งหมด</button>
+
+  </div>
+
+  <script>
+    // 1. แผนที่ Leaflet + ESRI (ฟรี 100% ไม่มีลายน้ำ)
+    const map = L.map('map', { zoomControl: false }).setView([13.756331, 100.501765], 18);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: '© Esri'
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // เครื่องมือวาด Geoman
+    map.pm.addControls({
+      position: 'topleft',
+      drawCircle: false,
+      drawMarker: false,
+      drawCircleMarker: false,
+      drawPolyline: false,
+      drawRectangle: false,
+      drawPolygon: true,
+      editMode: true,
+      dragMode: true,
+      removalMode: true
+    });
+
+    map.pm.setPathOptions({
+      color: '#1a73e8',
+      fillColor: '#4285f4',
+      fillOpacity: 0.35,
+      weight: 3,
+      dashArray: '5, 5'
+    });
+
+    // แนวรั้วเริ่มต้น
+    const sampleFence = [
+      [13.75650, 100.50160],
+      [13.75655, 100.50200],
+      [13.75615, 100.50205],
+      [13.75610, 100.50165]
+    ];
+    let fenceLayer = L.polygon(sampleFence).addTo(map);
+
+    map.on('pm:create', function (e) {
+      if (fenceLayer) map.removeLayer(fenceLayer);
+      fenceLayer = e.layer;
+    });
+
+    // 2. ฟังก์ชันเพิ่มช่องกรอกผู้ดูแล
+    function addCaregiverField() {
+      const container = document.getElementById('caregiversList');
+      const div = document.createElement('div');
+      div.className = 'caregiver-item';
+      div.innerHTML = `
+        <input type="text" placeholder="ชื่อผู้ดูแล" style="flex: 2;">
+        <input type="text" placeholder="User ID (U...)" style="flex: 3;">
+        <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(div);
+    }
+
+    // 3. บันทึกข้อมูลและผูกทุกอย่างเข้าด้วยกัน
+    function saveAllBindingData() {
+      const deviceId = document.getElementById('deviceId').value.trim();
+      const patientName = document.getElementById('patientName').value.trim();
+      const patientNote = document.getElementById('patientNote').value.trim();
+      const buzzerEnabled = document.getElementById('buzzerSwitch').checked;
+
+      // ดึงรายชื่อผู้ดูแล
+      const caregiverItems = document.querySelectorAll('#caregiversList .caregiver-item');
+      const caregivers = [];
+      caregiverItems.forEach(item => {
+        const inputs = item.querySelectorAll('input');
+        const name = inputs[0].value.trim();
+        const userId = inputs[1].value.trim();
+        if (userId) {
+          caregivers.push({ name: name || 'ผู้ดูแล', userId: userId });
+        }
+      });
+
+      // ดึงพิกัดแนวรั้วบ้าน
+      let fenceCoords = [];
+      if (fenceLayer) {
+        fenceCoords = fenceLayer.getLatLngs()[0].map(pt => [pt.lat, pt.lng]);
+      }
+
+      const boundData = {
+        deviceId,
+        patientName,
+        note: patientNote,
+        buzzer: { enabled: buzzerEnabled },
+        caregivers,
+        homeFence: { polygon: fenceCoords }
+      };
+
+      console.log("กำลังบันทึกข้อมูลผูกเครื่อง:", boundData);
+
+      // เปลี่ยนข้อความบนปุ่มระหว่างบันทึก
+      const submitBtn = document.querySelector('.btn-submit');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "⏳ กำลังบันทึกข้อมูลลงระบบคลาวด์...";
+      }
+
+      // 1. บันทึกลง localStorage ในเครื่อง
+      localStorage.setItem('saved_tracker_' + deviceId, JSON.stringify(boundData));
+
+      // 2. บันทึกลงฐานข้อมูลคลาวด์ Google Apps Script & Google Sheets
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerText = "💾 บันทึกและผูกข้อมูลทั้งหมด";
+            }
+            alert(`✅ บันทึกข้อมูลลงระบบคลาวด์สำเร็จเรียบร้อยแล้ว!\n\n` +
+              `• รหัสเครื่อง: ${deviceId}\n` +
+              `• ผู้ป่วย: ${patientName}\n` +
+              `• ผู้ดูแล: ${caregivers.length} คน\n` +
+              `• Buzzer: ${buzzerEnabled ? 'เปิดใช้งาน' : 'ปิด'}\n` +
+              `• มุมรั้วบ้าน: ${fenceCoords.length} จุด\n\n` +
+              `ข้อมูลถูกอัปเดตลง Google Sheets และพร้อมส่งข้อมูลใน LINE เรียบร้อยแล้วครับ!`);
+          })
+          .withFailureHandler(function (err) {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerText = "💾 บันทึกและผูกข้อมูลทั้งหมด";
+            }
+            alert(`⚠️ บันทึกไม่สำเร็จ: ${err.message}`);
+          })
+          .savePatientData(boundData);
+      } else {
+        // กรณีเปิดแบบ Local File (ไม่มี google.script.run)
+        fetch('/api/bind-device', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(boundData)
+        }).catch(() => { });
+
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerText = "💾 บันทึกและผูกข้อมูลทั้งหมด";
+        }
+
+        alert(`✅ บันทึกข้อมูลในเครื่องเรียบร้อยแล้ว!\n\n` +
+          `• รหัสเครื่อง: ${deviceId}\n` +
+          `• ผู้ป่วย: ${patientName}\n` +
+          `• ผู้ดูแล: ${caregivers.length} คน\n\n` +
+          `หากเปิดผ่านลิงก์ Google Apps Script ข้อมูลจะถูกบันทึกลง Google Sheets ทันทีครับ`);
+      }
+    }
+
+    // 4. โหลดข้อมูลเดิมที่เคยบันทึกไว้ขึ้นมาแสดงอัตโนมัติเมื่อเปิดหน้าเว็บ
+    window.addEventListener('DOMContentLoaded', function () {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function (data) {
+            if (data) populateFormData(data);
+          })
+          .getPatientData();
+      } else {
+        const saved = localStorage.getItem('saved_tracker_TRACKER_01');
+        if (saved) {
+          try {
+            populateFormData(JSON.parse(saved));
+          } catch (e) { }
+        }
+      }
+    });
+
+    function populateFormData(data) {
+      if (!data) return;
+      if (data.deviceId) document.getElementById('deviceId').value = data.deviceId;
+      if (data.patientName) document.getElementById('patientName').value = data.patientName;
+      if (data.note) document.getElementById('patientNote').value = data.note;
+      if (data.buzzer && data.buzzer.enabled !== undefined) {
+        document.getElementById('buzzerSwitch').checked = data.buzzer.enabled;
+      }
+      if (data.caregivers && data.caregivers.length > 0) {
+        const container = document.getElementById('caregiversList');
+        container.innerHTML = '';
+        data.caregivers.forEach(cg => {
+          const div = document.createElement('div');
+          div.className = 'caregiver-item';
+          div.innerHTML = `
+            <input type="text" placeholder="ชื่อผู้ดูแล" value="${cg.name || ''}" style="flex: 2;">
+            <input type="text" placeholder="User ID (U...)" value="${cg.userId || ''}" style="flex: 3;">
+            <button class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+          `;
+          container.appendChild(div);
+        });
+      }
+      if (data.homeFence && data.homeFence.polygon && data.homeFence.polygon.length > 0) {
+        if (fenceLayer) map.removeLayer(fenceLayer);
+        fenceLayer = L.polygon(data.homeFence.polygon).addTo(map);
+        map.fitBounds(fenceLayer.getBounds(), { padding: [30, 30] });
+      }
+    }
+  </script>
+</body>
+
+</html>

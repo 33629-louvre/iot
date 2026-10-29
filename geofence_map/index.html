@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>กำหนดแนวรั้วบ้าน (Polygon Geofence) - Free Open Source</title>
+
+  <!-- 1. Leaflet.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- 2. Leaflet-Geoman -->
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+  <!-- 3. Turf.js -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Prompt', 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    body,
+    html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #f0f2f5;
+    }
+
+    #map {
+      width: 100%;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    /* Top Control Bar */
+    .header-bar {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      padding: 10px 18px;
+      border-radius: 30px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 90%;
+    }
+
+    .header-bar h1 {
+      font-size: 14px;
+      color: #1a73e8;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Bottom Info & Action Panel */
+    .bottom-panel {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: 92%;
+      max-width: 450px;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .status-ok {
+      background: #E6F4EA;
+      color: #137333;
+    }
+
+    .status-alert {
+      background: #FCE8E6;
+      color: #C5221F;
+    }
+
+    .status-idle {
+      background: #E8F0FE;
+      color: #1A73E8;
+    }
+
+    .desc-text {
+      font-size: 12px;
+      color: #5f6368;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      border: none;
+      padding: 11px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-save {
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    .btn-save:hover {
+      background: #1557b0;
+    }
+
+    .btn-clear {
+      background: #f1f3f4;
+      color: #3c4043;
+    }
+
+    .btn-clear:hover {
+      background: #e8eaed;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <div class="header-bar">
+    <h1>🏡 กำหนดแนวรั้วบ้าน (Polygon Geofence)</h1>
+  </div>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <!-- Bottom Panel -->
+  <div class="bottom-panel">
+    <div id="statusBadge" class="status-badge status-idle">
+      ℹ️ แตะที่รูปห้าเหลี่ยมทางซ้าย เพื่อเริ่มวาดรั้วบ้าน
+    </div>
+    <div id="infoText" class="desc-text">
+      ใช้นิ้วจิ้มล้อมรอบตัวบ้านจริง เมื่อครบทุกมุมให้จิ้มบรรจบที่จุดเริ่มต้นเพื่อปิดกรอบรั้ว
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-clear" onclick="clearGeofence()">🗑️ ล้างแนวรั้ว</button>
+      <button class="btn btn-save" onclick="saveGeofence()">💾 บันทึกแนวรั้วนี้</button>
+    </div>
+  </div>
+
+  <script>
+    const initialLat = 13.756331;
+    const initialLng = 100.501765;
+
+    const map = L.map('map', {
+      zoomControl: false
+    }).setView([initialLat, initialLng], 18);
+
+    // 1. แผนที่ถนน ESRI World Street Map (ฟรี 100% ไม่ต้องใช้ API Key ไม่มีลายน้ำ)
+    const streetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: '© Esri Street Map'
+    });
+
+    // 2. ภาพถ่ายดาวเทียม Google Hybrid (ฟรี คมชัด เห็นแนวรั้วจริง)
+    const satelliteMap = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: 'Satellite Imagery'
+    });
+
+    // แสดงแผนที่ถนนเป็นค่าเริ่มต้น
+    streetMap.addTo(map);
+
+    // เมนูสลับแผนที่ถนน / ดาวเทียม (มุมขวาบน)
+    const baseMaps = {
+      "🗺️ แผนที่ถนน (Street)": streetMap,
+      "🛰️ ภาพดาวเทียม (Satellite)": satelliteMap
+    };
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // 2. ตั้งค่าเครื่องมือวาด Geoman (รองรับทัชสกรีนมือถือ)
+    map.pm.addControls({
+      position: 'topleft',
+      drawCircle: false,
+      drawMarker: false,
+      drawCircleMarker: false,
+      drawPolyline: false,
+      drawRectangle: false,
+      drawPolygon: true, // เปิดเฉพาะวาดรูปหลายเหลี่ยมตามแนวรั้ว
+      editMode: true,    // ขยับเสามุมรั้วได้
+      dragMode: true,    // ลากย้ายทั้งกรอบได้
+      cutPolygon: false,
+      removalMode: true  // ลบรั้วได้
+    });
+
+    // กำหนดสีของแนวรั้วบ้าน
+    map.pm.setPathOptions({
+      color: '#1a73e8',
+      fillColor: '#4285f4',
+      fillOpacity: 0.35,
+      weight: 3,
+      dashArray: '5, 5'
+    });
+
+    let homeFenceLayer = null;
+    let homeFencePolygonGeoJSON = null;
+
+    // ตัวอย่างแนวรั้วเริ่มต้น 4 มุม
+    const sampleFencePoints = [
+      [13.75650, 100.50160],
+      [13.75655, 100.50200],
+      [13.75615, 100.50205],
+      [13.75610, 100.50165]
+    ];
+    homeFenceLayer = L.polygon(sampleFencePoints).addTo(map);
+    homeFencePolygonGeoJSON = homeFenceLayer.toGeoJSON();
+    updateStatusBadge();
+
+    // 3. เมื่อผู้ใช้วาดรูปหลายเหลี่ยมเสร็จ
+    map.on('pm:create', function (e) {
+      if (homeFenceLayer) {
+        map.removeLayer(homeFenceLayer);
+      }
+      homeFenceLayer = e.layer;
+      homeFencePolygonGeoJSON = homeFenceLayer.toGeoJSON();
+      updateStatusBadge();
+    });
+
+    map.on('pm:remove', function () {
+      homeFenceLayer = null;
+      homeFencePolygonGeoJSON = null;
+      updateStatusBadge();
+    });
+
+    function updateStatusBadge() {
+      const badge = document.getElementById('statusBadge');
+      const info = document.getElementById('infoText');
+      if (homeFenceLayer) {
+        const points = homeFenceLayer.getLatLngs()[0].length;
+        badge.className = 'status-badge status-ok';
+        badge.innerHTML = `✅ ตีกรอบรั้วบ้านสำเร็จ (${points} มุมเสารั้ว)`;
+        info.innerHTML = 'คุณสามารถใช้นิ้วแตะที่มุมรั้วเพื่อดึงขยับปรับตำแหน่งได้ตลอดเวลา หรือสลับเป็น "ภาพดาวเทียม" เพื่อดูแนวรั้วจริงได้ที่มุมขวาบน';
+      } else {
+        badge.className = 'status-badge status-idle';
+        badge.innerHTML = 'ℹ️ ยังไม่มีแนวรั้วบ้าน';
+        info.innerHTML = 'แตะที่ไอคอนรูปห้าเหลี่ยมทางซ้าย แล้วใช้นิ้วจิ้มตามมุมรั้วบ้านเพื่อเริ่มตีกรอบ';
+      }
+    }
+
+    // 4. ทดสอบคลิกบนแผนที่เพื่อดูว่า "อยู่ในบ้าน" หรือ "ออกนอกบ้าน" (Point-in-Polygon)
+    let testMarker = null;
+    map.on('click', function (e) {
+      if (!homeFencePolygonGeoJSON) return;
+
+      const clickPoint = turf.point([e.latlng.lng, e.latlng.lat]);
+      const isInside = turf.booleanPointInPolygon(clickPoint, homeFencePolygonGeoJSON);
+
+      if (testMarker) map.removeLayer(testMarker);
+
+      const markerColor = isInside ? '#137333' : '#d93025';
+      const statusTitle = isInside ? '🟢 อยู่ในบ้านตามปกติ' : '🔴 ออกนอกเขตบ้าน (ฉุกเฉิน 30s!)';
+
+      testMarker = L.circleMarker([e.latlng.lat, e.latlng.lng], {
+        radius: 8,
+        color: '#fff',
+        fillColor: markerColor,
+        fillOpacity: 1,
+        weight: 2
+      }).addTo(map);
+
+      testMarker.bindPopup(`<b>${statusTitle}</b><br>พิกัด: ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`).openPopup();
+    });
+
+    function clearGeofence() {
+      if (homeFenceLayer) {
+        map.removeLayer(homeFenceLayer);
+        homeFenceLayer = null;
+        homeFencePolygonGeoJSON = null;
+      }
+      if (testMarker) map.removeLayer(testMarker);
+      updateStatusBadge();
+    }
+
+    function saveGeofence() {
+      if (!homeFenceLayer) {
+        alert('กรุณาวาดแนวรั้วบ้านก่อนกดบันทึกครับ');
+        return;
+      }
+      const latlngs = homeFenceLayer.getLatLngs()[0];
+      const coordinates = latlngs.map(pt => [pt.lat, pt.lng]);
+      console.log("บันทึกพิกัดแนวรั้วบ้าน:", coordinates);
+      alert(`✅ บันทึกแนวรั้วบ้านสำเร็จ!\nมีจำนวนมุมรั้ว: ${coordinates.length} จุด\nพิกัดพร้อมนำไปใช้งานในระบบ GPS Tracker แล้วครับ`);
+    }
+  </script>
+</body>
+
+</html>
