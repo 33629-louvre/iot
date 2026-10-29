@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ระบบติดตามตำแหน่ง GPS ผู้สวมใส่ แจ้งเตือนผู้ดูแลผ่าน LINE Official Account (LINE OA)
 ### สำหรับบอร์ด iLabs Challenger+ RP2350 NB-IoT ร่วมกับซิม 1NCE IoT SIM
 
@@ -129,3 +130,6 @@ cd c:\Users\User\Documents\azm\simulator
 .\simulate_tracker.ps1
 ```
 - ระบบจะจำลอง 3 เงื่อนไข: อยู่นิ่ง (2 ชม.), มีการเคลื่อนไหว (2 นาที), และเดินออกนอกบ้าน (30 วินาที) โดยแจ้งเตือนจะเด้งเข้า LINE OA ของผู้ดูแลทันที!
+
+# iot
+ 878b668abef8dce5473807d81a95e2bc2aaef466
