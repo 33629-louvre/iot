@@ -9,8 +9,8 @@ $headers = @{
     "Authorization" = "Bearer $token"
 }
 
-# ลิงก์สำหรับเปิดแบบฟอร์ม (สามารถแทนที่ด้วยลิงก์ LIFF หรือ Hosting ของคุณได้)
-$formUrl = "https://script.google.com/macros/s/AKfycbwdNLK2VmcznQ9beF9dgV6tKbPZicYgBio1gJ-N4e8CYWfKlq_Y4Np72AhN1MVh7Ao3/exec"
+# ลิงก์สำหรับเปิดแบบฟอร์ม (เติม ?openExternalBrowser=1 เพื่อให้เปิดใน Chrome/Safari บนมือถือได้ทันที ไม่ติดหน้าขาวใน LINE)
+$formUrl = "https://script.google.com/macros/s/AKfycbwdNLK2VmcznQ9beF9dgV6tKbPZicYgBio1gJ-N4e8CYWfKlq_Y4Np72AhN1MVh7Ao3/exec?openExternalBrowser=1"
 
 $flexMessage = @{
     type = "flex"
@@ -96,7 +96,7 @@ $flexMessage = @{
                     action = @{
                         type = "uri"
                         label = "📝 เปิดแบบฟอร์มลงทะเบียน"
-                        uri = "https://www.google.com" # แทนที่ด้วยลิงก์เว็บฟอร์ม
+                        uri = $formUrl
                     }
                 }
             )

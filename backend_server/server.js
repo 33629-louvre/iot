@@ -17,6 +17,8 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
@@ -28,6 +30,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 let CAREGIVER_LINE_USER_ID = process.env.CAREGIVER_LINE_USER_ID || '';
+const FORM_URL = process.env.FORM_URL || 'https://script.google.com/macros/s/AKfycbwdNLK2VmcznQ9beF9dgV6tKbPZicYgBio1gJ-N4e8CYWfKlq_Y4Np72AhN1MVh7Ao3/exec';
 
 // การตั้งค่าพิกัดบ้าน (ผู้ดูแลสามารถอัปเดตได้แบบ Dynamic)
 let homeConfig = {
@@ -368,7 +371,92 @@ app.post('/api/set-home', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// Endpoint 4: LINE OA Webhook (ให้ผู้ดูแลพิมพ์คุย หรือแชร์ Location เพื่อตั้งบ้าน)
+// Endpoint 4: เปิด / Redirect ไปยังแบบฟอร์มลงทะเบียน
+// -----------------------------------------------------------------------------
+app.get('/form', (req, res) => {
+  res.redirect(FORM_URL);
+});
+
+// เสิร์ฟหน้าเว็บ Geofence Map / จัดการผู้ป่วยแบบ Local
+app.use('/manage', express.static(path.join(__dirname, '../geofence_map')));
+
+// -----------------------------------------------------------------------------
+// Endpoint 5: ดึง / บันทึกข้อมูลผูกเครื่อง (Devices & Patients)
+// -----------------------------------------------------------------------------
+const devicesFilePath = path.join(__dirname, 'data', 'devices.json');
+
+app.get('/api/devices', (req, res) => {
+  if (fs.existsSync(devicesFilePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(devicesFilePath, 'utf8'));
+      return res.json(data);
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to read devices.json' });
+    }
+  }
+  res.json({});
+});
+
+app.post('/api/bind-device', (req, res) => {
+  const { deviceId, patientName, note, buzzer, caregivers, homeFence } = req.body;
+  const targetId = deviceId || trackerState.deviceId || 'TRACKER_01';
+
+  let devicesData = {};
+  if (fs.existsSync(devicesFilePath)) {
+    try {
+      devicesData = JSON.parse(fs.readFileSync(devicesFilePath, 'utf8'));
+    } catch (e) {
+      console.error('Error reading devices.json:', e);
+    }
+  }
+
+  devicesData[targetId] = {
+    deviceId: targetId,
+    patientName: patientName || 'ผู้สวมใส่',
+    note: note || '',
+    buzzer: buzzer || { enabled: true, beepIntervalMs: 500 },
+    homeFence: homeFence || { type: 'polygon', radiusMeters: 50, polygon: [] },
+    caregivers: caregivers || [],
+    status: {
+      currentMode: trackerState.currentMode,
+      isAlertMuted: false,
+      lastLat: trackerState.lastLat,
+      lastLng: trackerState.lastLng,
+      lastUpdate: new Date().toISOString()
+    }
+  };
+
+  // หากมีการกำหนดกรอบแนวรั้วบ้านแบบโพลีกอน ให้นำจุดกึ่งกลางมาตั้งเป็นพิกัดบ้าน
+  if (homeFence && homeFence.polygon && homeFence.polygon.length > 0) {
+    const centerLat = homeFence.polygon.reduce((acc, p) => acc + p[0], 0) / homeFence.polygon.length;
+    const centerLng = homeFence.polygon.reduce((acc, p) => acc + p[1], 0) / homeFence.polygon.length;
+    homeConfig.latitude = centerLat;
+    homeConfig.longitude = centerLng;
+    console.log(`[BIND] คำนวณจุดศูนย์กลางแนวรั้วบ้านใหม่: Lat ${centerLat.toFixed(6)}, Lng ${centerLng.toFixed(6)}`);
+  }
+
+  // ผูก LINE User ID ของผู้ดูแลคนแรกเป็นผู้ดูแลหลัก
+  if (caregivers && caregivers.length > 0 && caregivers[0].userId) {
+    CAREGIVER_LINE_USER_ID = caregivers[0].userId;
+    console.log(`[BIND] อัปเดต CAREGIVER_LINE_USER_ID หลัก: ${CAREGIVER_LINE_USER_ID}`);
+  }
+
+  try {
+    fs.writeFileSync(devicesFilePath, JSON.stringify(devicesData, null, 2), 'utf8');
+    console.log(`[BIND] บันทึกข้อมูลอุปกรณ์ ${targetId} ลงใน devices.json เรียบร้อยแล้ว`);
+  } catch (err) {
+    console.error('[BIND] ไม่สามารถบันทึก devices.json ได้:', err.message);
+  }
+
+  return res.json({
+    status: 'OK',
+    message: 'Device bound successfully',
+    device: devicesData[targetId]
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Endpoint 6: LINE OA Webhook (รับข้อความ, Location, หรือการทักทายจากผู้ดูแล)
 // -----------------------------------------------------------------------------
 app.post('/webhook', async (req, res) => {
   const events = req.body.events || [];
@@ -386,7 +474,6 @@ app.post('/webhook', async (req, res) => {
       homeConfig.longitude = event.message.longitude;
       console.log(`[LINE Webhook] ผู้ดูแลตั้งพิกัดบ้านผ่าน LINE: ${homeConfig.latitude}, ${homeConfig.longitude}`);
 
-      // ส่งข้อความตอบกลับยืนยัน
       if (event.replyToken && LINE_CHANNEL_ACCESS_TOKEN) {
         await axios.post(
           'https://api.line.me/v2/bot/message/reply',
@@ -408,6 +495,107 @@ app.post('/webhook', async (req, res) => {
         ).catch(e => console.error(e.message));
       }
     }
+
+    // กรณีผู้ดูแลส่งข้อความ (Text) หรือเพิ่มเพื่อนใหม่ (Follow)
+    else if ((event.type === 'message' && event.message.type === 'text') || event.type === 'follow') {
+      const incomingText = event.message?.text?.trim() || '';
+      const lowerText = incomingText.toLowerCase();
+
+      let replyMessages = [];
+
+      // เงื่อนไข 1: ขอรหัส (เช่น "ขอรหัส", "รหัส", "uid", "id", "user id")
+      if (incomingText.includes('ขอรหัส') || incomingText === 'รหัส' || lowerText === 'uid' || lowerText === 'id' || lowerText === 'user id') {
+        replyMessages = [
+          {
+            type: 'text',
+            text: `🔑 รหัสประจำตัวผู้ดูแล (User ID) ของคุณคือ:\n\n${userId}\n\n📋 กดคัดลอกรหัสนี้เพื่อนำไปกรอกในแบบฟอร์มลงทะเบียน หรือส่งต่อให้แอดมินได้เลยครับ`
+          }
+        ];
+      }
+
+      // เงื่อนไข 2: ขอข้อมูล (เช่น "ขอข้อมูล", "ข้อมูล", "เช็คข้อมูล", "ดูข้อมูล", "สถานะ")
+      else if (incomingText.includes('ขอข้อมูล') || incomingText === 'ข้อมูล' || incomingText.includes('เช็คข้อมูล') || incomingText.includes('ดูข้อมูล') || incomingText === 'สถานะ') {
+        let boundDevice = null;
+        if (fs.existsSync(devicesFilePath)) {
+          try {
+            const allDevs = JSON.parse(fs.readFileSync(devicesFilePath, 'utf8'));
+            for (const dId of Object.keys(allDevs)) {
+              const dev = allDevs[dId];
+              if (dev.caregivers && dev.caregivers.some(cg => cg.userId === userId)) {
+                boundDevice = dev;
+                break;
+              }
+            }
+            if (!boundDevice && Object.keys(allDevs).length > 0) {
+              boundDevice = allDevs[Object.keys(allDevs)[0]];
+            }
+          } catch (e) { }
+        }
+
+        if (boundDevice) {
+          const caregiversList = (boundDevice.caregivers || [])
+            .map((cg, i) => `   ${i + 1}. ${cg.name || 'ผู้ดูแล'} (${cg.userId})`)
+            .join('\n') || '   - ยังไม่มีผู้ดูแลในระบบ';
+
+          const fencePoints = boundDevice.homeFence?.polygon?.length || 0;
+          const fenceInfo = fencePoints > 0 ? `กำหนดแล้ว (${fencePoints} มุม) 🏡` : 'ยังไม่ได้กำหนด';
+
+          replyMessages = [
+            {
+              type: 'text',
+              text: `📋 ข้อมูลทั้งหมดที่ผูกกับ User ID ของคุณ:\n\n` +
+                `🏷️ รหัสเครื่อง GPS: ${boundDevice.deviceId || '-'}\n` +
+                `👤 ผู้ป่วย / ผู้สวมใส่: ${boundDevice.patientName || '-'}\n` +
+                `📝 อาการ / หมายเหตุ: ${boundDevice.note || 'ไม่มี'}\n` +
+                `🔊 เสียง Buzzer สายรัดแขน: ${boundDevice.buzzer?.enabled ? 'เปิดใช้งาน 🔊' : 'ปิด 🔇'}\n` +
+                `🏡 แนวรั้วบ้าน: ${fenceInfo}\n\n` +
+                `👥 รายชื่อผู้ดูแลทั้งหมด (${boundDevice.caregivers?.length || 0} คน):\n` +
+                `${caregiversList}\n\n` +
+                `📝 ตรวจสอบแผนที่หรือแก้ไขข้อมูล:\n${FORM_URL}`
+            }
+          ];
+        } else {
+          replyMessages = [
+            {
+              type: 'text',
+              text: `🔍 ตรวจสอบรหัส User ID:\n${userId}\n\n` +
+                `❌ ยังไม่พบข้อมูลผู้ป่วยที่ผูกกับบัญชีของคุณในระบบครับ\n\n` +
+                `💡 กดเปิดแบบฟอร์มด้านล่างเพื่อลงทะเบียนและผูกเครื่องได้ทันที:\n${FORM_URL}`
+            }
+          ];
+        }
+      }
+
+      // เงื่อนไข 3: ข้อความอื่น ๆ หรือทักทาย -> แสดงคำแนะนำการใช้งาน
+      else {
+        replyMessages = [
+          {
+            type: 'text',
+            text: `👋 สวัสดีครับผู้ดูแล!\n\n` +
+              `เมนูคำสั่งที่คุณสามารถพิมพ์ได้:\n` +
+              `• พิมพ์ "ขอรหัส" -> ระบบจะส่งรหัส User ID ให้ทันที\n` +
+              `• พิมพ์ "ขอข้อมูล" -> ระบบจะตรวจสอบ User ID และส่งข้อมูลทุกอย่างให้\n\n` +
+              `📝 หรือเปิดแบบฟอร์มลงทะเบียน/ตั้งค่าแนวรั้วบ้าน:\n${FORM_URL}`
+          }
+        ];
+      }
+
+      if (event.replyToken && LINE_CHANNEL_ACCESS_TOKEN) {
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          {
+            replyToken: event.replyToken,
+            messages: replyMessages
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+            }
+          }
+        ).catch(e => console.error(e.message));
+      }
+    }
   }
   res.status(200).send('OK');
 });
@@ -419,6 +607,7 @@ app.listen(PORT, () => {
   console.log(`📍 พิกัดบ้านปัจจุบัน: Lat ${homeConfig.latitude}, Lng ${homeConfig.longitude}`);
   console.log(`📏 รัศมีเขตบ้าน: ${homeConfig.radiusMeters} เมตร`);
   console.log(`⏱️ ความถี่การส่ง: อยู่นิ่ง=${INTERVALS.STATIONARY}s | เคลื่อนไหว=${INTERVALS.MOVING}s | ออกนอกบ้าน=${INTERVALS.OUTSIDE}s`);
+  console.log(`📝 ลิงก์แบบฟอร์มลงทะเบียน: ${FORM_URL}`);
   console.log('=============================================================');
 });
 
