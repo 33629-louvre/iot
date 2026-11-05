@@ -2,7 +2,8 @@
 # Simulate All 3 Tracker Modes to Caregiver LINE OA (Pure ASCII Safe for PS 5.1)
 # =============================================================================
 
-$envFile = "c:\Users\User\Documents\azm\backend_server\.env"
+$envFile = Join-Path $PSScriptRoot "backend_server\.env"
+if (-not (Test-Path $envFile)) { $envFile = "c:\Users\User\Desktop\azm\backend_server\.env" }
 $token = ""
 $userId = ""
 

@@ -3,30 +3,41 @@
     "deviceId": "TRACKER_01",
     "patientName": "คุณตาสมชาย",
     "note": "ผู้ป่วยอัลไซเมอร์ สวมสายรัดแขนข้อมือซ้าย",
+    "wearerPosition": "สายรัดแขนข้อมือซ้าย",
+    "hardware": {
+      "board": "iLabs Challenger+ RP2350 NB-IoT",
+      "gnss": "ST87M01-1301 Concurrent GNSS",
+      "sim": "1NCE IoT SIM (APN: iot.1nce.net)",
+      "fwVersion": "v1.2.0"
+    },
     "buzzer": {
       "enabled": true,
       "beepIntervalMs": 500
     },
     "homeFence": {
       "type": "polygon",
+      "centerLat": 13.756331,
+      "centerLng": 100.501765,
       "radiusMeters": 50,
       "polygon": [
-        [13.75650, 100.50160],
-        [13.75655, 100.50200],
+        [13.7565, 100.5016],
+        [13.75655, 100.502],
         [13.75615, 100.50205],
-        [13.75610, 100.50165]
+        [13.7561, 100.50165]
       ]
     },
     "caregivers": [
       {
         "userId": "U1664630158334b37fcdac10318ee0d4e",
         "name": "ลูกสาว (ผู้ดูแลหลัก)",
-        "phone": "081-xxx-xxxx"
+        "phone": "081-xxx-xxxx",
+        "isPrimary": true
       },
       {
         "userId": "U8af540fcc48dcc553f87d88aed55bab4",
         "name": "ลูกชาย (ผู้ดูแลสำรอง)",
-        "phone": "089-xxx-xxxx"
+        "phone": "089-xxx-xxxx",
+        "isPrimary": false
       }
     ],
     "status": {
@@ -34,8 +45,11 @@
       "isAlertMuted": false,
       "lastLat": 13.756331,
       "lastLng": 100.501765,
+      "lastSpeed": 0.0,
+      "battery": 98,
+      "distanceFromHome": 8,
+      "isOnline": true,
       "lastUpdate": "2026-10-29T09:55:00Z"
     }
   }
 }
-

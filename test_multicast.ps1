@@ -2,7 +2,8 @@
 # Test Multi-Device and Multi-Caregiver Alert Card (ASCII Safe)
 # =============================================================================
 
-$envFile = "c:\Users\User\Documents\azm\backend_server\.env"
+$envFile = Join-Path $PSScriptRoot "backend_server\.env"
+if (-not (Test-Path $envFile)) { $envFile = "c:\Users\User\Desktop\azm\backend_server\.env" }
 $token = ""
 $userId = ""
 
@@ -24,77 +25,77 @@ $lng = "100.504500"
 $mapsUrl = "https://www.google.com/maps?q=$lat,$lng"
 
 $payload = @{
-    to = $userId
+    to       = $userId
     messages = @(
         @{
-            type = "flex"
-            altText = "Emergency: Grandpa Outside Home Geofence!"
+            type     = "flex"
+            altText  = "Emergency: Grandpa Outside Home Geofence!"
             contents = @{
-                type = "bubble"
+                type   = "bubble"
                 header = @{
-                    type = "box"
-                    layout = "vertical"
+                    type            = "box"
+                    layout          = "vertical"
                     backgroundColor = "#D93025"
-                    paddingAll = "15px"
-                    contents = @(
+                    paddingAll      = "15px"
+                    contents        = @(
                         @{
-                            type = "text"
-                            text = "EMERGENCY: OUTSIDE HOME AREA!"
+                            type   = "text"
+                            text   = "EMERGENCY: OUTSIDE HOME AREA!"
                             weight = "bold"
-                            color = "#FFFFFF"
-                            size = "md"
+                            color  = "#FFFFFF"
+                            size   = "md"
                         }
                         @{
-                            type = "text"
-                            text = "Target: Grandpa (Device: TRACKER_01)"
-                            size = "xs"
-                            color = "#FFFFFF"
+                            type   = "text"
+                            text   = "Target: Grandpa (Device: TRACKER_01)"
+                            size   = "xs"
+                            color  = "#FFFFFF"
                             weight = "bold"
                             margin = "xs"
                         }
                     )
                 }
-                body = @{
-                    type = "box"
-                    layout = "vertical"
-                    spacing = "sm"
+                body   = @{
+                    type       = "box"
+                    layout     = "vertical"
+                    spacing    = "sm"
                     paddingAll = "15px"
-                    contents = @(
+                    contents   = @(
                         @{
-                            type = "box"
-                            layout = "horizontal"
+                            type     = "box"
+                            layout   = "horizontal"
                             contents = @(
                                 @{ type = "text"; text = "Wearer:"; size = "xs"; color = "#888888"; flex = 2 }
                                 @{ type = "text"; text = "Grandpa (Elderly)"; size = "xs"; weight = "bold"; flex = 5 }
                             )
                         }
                         @{
-                            type = "box"
-                            layout = "horizontal"
+                            type     = "box"
+                            layout   = "horizontal"
                             contents = @(
                                 @{ type = "text"; text = "Caregivers:"; size = "xs"; color = "#888888"; flex = 2 }
                                 @{ type = "text"; text = "Phone 1 and Phone 2 (Both Alerted)"; size = "xs"; color = "#1E8E3E"; weight = "bold"; flex = 5 }
                             )
                         }
                         @{
-                            type = "box"
-                            layout = "horizontal"
+                            type     = "box"
+                            layout   = "horizontal"
                             contents = @(
                                 @{ type = "text"; text = "Status:"; size = "xs"; color = "#888888"; flex = 2 }
                                 @{ type = "text"; text = "OUTSIDE GEOFENCE (Alert!)"; size = "xs"; weight = "bold"; color = "#D93025"; flex = 5 }
                             )
                         }
                         @{
-                            type = "box"
-                            layout = "horizontal"
+                            type     = "box"
+                            layout   = "horizontal"
                             contents = @(
                                 @{ type = "text"; text = "Distance:"; size = "xs"; color = "#888888"; flex = 2 }
                                 @{ type = "text"; text = "320 meters (Safe radius: 50m)"; size = "xs"; flex = 5 }
                             )
                         }
                         @{
-                            type = "box"
-                            layout = "horizontal"
+                            type     = "box"
+                            layout   = "horizontal"
                             contents = @(
                                 @{ type = "text"; text = "Interval:"; size = "xs"; color = "#888888"; flex = 2 }
                                 @{ type = "text"; text = "Every 30 Seconds"; size = "xs"; flex = 5 }
@@ -103,18 +104,18 @@ $payload = @{
                     )
                 }
                 footer = @{
-                    type = "box"
-                    layout = "vertical"
+                    type       = "box"
+                    layout     = "vertical"
                     paddingAll = "12px"
-                    contents = @(
+                    contents   = @(
                         @{
-                            type = "button"
-                            style = "primary"
-                            color = "#D93025"
+                            type   = "button"
+                            style  = "primary"
+                            color  = "#D93025"
                             action = @{
-                                type = "uri"
+                                type  = "uri"
                                 label = "Open Google Maps"
-                                uri = $mapsUrl
+                                uri   = $mapsUrl
                             }
                         }
                     )

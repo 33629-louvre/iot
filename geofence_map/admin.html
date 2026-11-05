@@ -1,0 +1,2404 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบหลังบ้านผู้ดูแลระบบ (Admin Central Dashboard) - GPS Tracker</title>
+
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --primary-dark: #1557b0;
+      --primary-light: #e8f0fe;
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --danger: #ef4444;
+      --danger-light: #fee2e2;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: #f1f5f9;
+      color: var(--slate-800);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Header */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--slate-200);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .nav-container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #1a73e8, #0d47a1);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: white;
+      box-shadow: 0 4px 10px rgba(26, 115, 232, 0.3);
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--slate-900);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-text p {
+      font-size: 12px;
+      color: var(--slate-600);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--slate-100);
+      color: var(--slate-700);
+      border: 1px solid var(--slate-200);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--slate-600);
+    }
+
+    .status-dot.online {
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+
+    .status-dot.alert {
+      background: var(--danger);
+      animation: pulse-danger 1.5s infinite;
+    }
+
+    @keyframes pulse-danger {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      box-shadow: 0 4px 10px rgba(26, 115, 232, 0.25);
+    }
+
+    .btn-outline {
+      background: white;
+      border-color: var(--slate-200);
+      color: var(--slate-700);
+    }
+
+    .btn-outline:hover {
+      background: var(--slate-50);
+      border-color: var(--slate-300);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-warning {
+      background: var(--warning);
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #d97706;
+    }
+
+    .btn-sm {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1600px;
+      margin: 20px auto;
+      padding: 0 24px;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* Top KPI Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      border: 1px solid var(--slate-200);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .stat-icon.blue { background: var(--primary-light); color: var(--primary); }
+    .stat-icon.green { background: var(--success-light); color: var(--success); }
+    .stat-icon.amber { background: var(--warning-light); color: var(--warning); }
+    .stat-icon.red { background: var(--danger-light); color: var(--danger); }
+
+    .stat-info h3 {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--slate-600);
+      margin-bottom: 2px;
+    }
+
+    .stat-info .value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+
+    /* Dashboard Layout */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Sidebar: Device Directory */
+    .sidebar-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--slate-200);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 210px);
+      min-height: 550px;
+      position: sticky;
+      top: 85px;
+    }
+
+    .sidebar-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--slate-200);
+    }
+
+    .sidebar-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-header-top h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--slate-900);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .search-box {
+      position: relative;
+      margin-bottom: 10px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 12px 9px 36px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--slate-200);
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--slate-600);
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .filter-pill {
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 12px;
+      background: var(--slate-100);
+      color: var(--slate-600);
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .filter-pill.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .device-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .device-item {
+      background: #ffffff;
+      border: 1.5px solid var(--slate-200);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .device-item:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .device-item.selected {
+      border-color: var(--primary);
+      background: #f8faff;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+
+    .device-item-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .device-id-tag {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--slate-800);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .device-patient-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--slate-900);
+      margin-bottom: 8px;
+    }
+
+    .device-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--slate-600);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--slate-200);
+    }
+
+    .badge-mode {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .badge-mode.stationary { background: var(--success-light); color: #065f46; }
+    .badge-mode.moving { background: var(--warning-light); color: #92400e; }
+    .badge-mode.outside { background: var(--danger-light); color: #991b1b; animation: pulse-danger 1.5s infinite; }
+
+    .battery-bar-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+    }
+
+    /* Right Main Panel: Detail & Map */
+    .detail-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Selected Device Banner */
+    .device-banner {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      border: 1px solid var(--slate-200);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .banner-title-area {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .patient-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+      color: #0369a1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .banner-text h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--slate-900);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .banner-text p {
+      font-size: 13px;
+      color: var(--slate-600);
+      margin-top: 3px;
+    }
+
+    .banner-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Map Card */
+    .map-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--slate-200);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .map-header {
+      padding: 14px 20px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--slate-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .map-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-900);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .map-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #live-map {
+      width: 100%;
+      height: 440px;
+      z-index: 10;
+    }
+
+    .map-legend {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 500;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(6px);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border: 1px solid var(--slate-200);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Tabs & Content Sections */
+    .tabs-card {
+      background: white;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--slate-200);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .tabs-nav {
+      display: flex;
+      border-bottom: 1px solid var(--slate-200);
+      background: var(--slate-50);
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 14px 22px;
+      background: transparent;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slate-600);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--primary);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      background: white;
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content {
+      padding: 24px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Information Grids */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+
+    .info-box {
+      background: var(--slate-50);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      border: 1px solid var(--slate-200);
+    }
+
+    .info-box-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-700);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--slate-200);
+      padding-bottom: 6px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .info-label {
+      color: var(--slate-600);
+    }
+
+    .info-value {
+      font-weight: 600;
+      color: var(--slate-900);
+      text-align: right;
+    }
+
+    /* Caregivers Grid */
+    .caregivers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .caregiver-card {
+      background: white;
+      border: 1.5px solid var(--slate-200);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      position: relative;
+    }
+
+    .caregiver-card.primary {
+      border-color: #93c5fd;
+      background: #f0f7ff;
+    }
+
+    .caregiver-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .caregiver-badge.primary { background: #dbeafe; color: #1d4ed8; }
+    .caregiver-badge.secondary { background: var(--slate-100); color: var(--slate-600); }
+
+    .caregiver-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 4px;
+    }
+
+    .caregiver-phone {
+      font-size: 13px;
+      color: var(--slate-600);
+      margin-bottom: 10px;
+    }
+
+    .uid-box {
+      background: rgba(0, 0, 0, 0.04);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--slate-700);
+      word-break: break-all;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* Telemetry Table */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      background: var(--slate-100);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--slate-700);
+      border-bottom: 1px solid var(--slate-200);
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--slate-200);
+      color: var(--slate-800);
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      padding: 16px;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.active .modal-box {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--slate-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--slate-600);
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slate-700);
+      margin-bottom: 6px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--slate-200);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--slate-200);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: var(--slate-50);
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    }
+
+    /* Simulation Mode Selector in Modal */
+    .sim-mode-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .sim-mode-card {
+      border: 2px solid var(--slate-200);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sim-mode-card:hover {
+      border-color: var(--primary);
+    }
+
+    .sim-mode-card.selected {
+      border-color: var(--primary);
+      background: #f0f7ff;
+    }
+
+    .sim-mode-card .icon {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+    .sim-mode-card .title {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--slate-900);
+      color: white;
+      padding: 12px 20px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      z-index: 3000;
+    }
+
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="nav-container">
+      <div class="brand-section">
+        <div class="brand-icon">🛡️</div>
+        <div class="brand-text">
+          <h1>ศูนย์ควบคุมและติดตามผู้ป่วย GPS Tracker <span style="font-size: 12px; font-weight: 500; background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 12px;">Admin Portal</span></h1>
+          <p>ระบบหลังบ้านเฝ้าระวังผู้สวมใส่ผ่านเครือข่าย 1NCE NB-IoT / RP2350 ST87M01</p>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <!-- Server Connection Badge -->
+        <div id="conn-badge" class="status-badge">
+          <span id="conn-dot" class="status-dot"></span>
+          <span id="conn-text">กำลังตรวจสอบเซิร์ฟเวอร์...</span>
+        </div>
+
+        <!-- Auto Refresh Selector -->
+        <select id="auto-refresh-select" class="form-control" style="width: auto; padding: 6px 10px; font-size: 12px;">
+          <option value="5000">รีเฟรชทุก 5 วินาที</option>
+          <option value="10000">รีเฟรชทุก 10 วินาที</option>
+          <option value="30000">รีเฟรชทุก 30 วินาที</option>
+          <option value="0">ปิด Auto-refresh</option>
+        </select>
+
+        <button id="btn-manual-refresh" class="btn btn-outline btn-sm" title="รีเฟรชข้อมูลเดี๋ยวนี้">
+          🔄 รีเฟรช
+        </button>
+
+        <button id="btn-open-sim" class="btn btn-outline btn-sm" style="border-color: #3b82f6; color: #2563eb;">
+          🧪 ทดสอบจำลองพิกัด
+        </button>
+
+        <button id="btn-open-add-device" class="btn btn-primary btn-sm">
+          ➕ เพิ่ม Tracker
+        </button>
+
+        <a href="/manage" target="_blank" class="btn btn-outline btn-sm" title="เปิดหน้าเว็บวาดแนวรั้วและลงทะเบียนผู้ป่วย">
+          🗺️ ระบบลงทะเบียนผู้ป่วย
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Top KPI Stats Row -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue">📱</div>
+        <div class="stat-info">
+          <h3>Tracker ทั้งหมดในระบบ</h3>
+          <div id="stat-total-devices" class="value">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon green">🏠</div>
+        <div class="stat-info">
+          <h3>อยู่นิ่งตามปกติ (ในบ้าน)</h3>
+          <div id="stat-stationary" class="value">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon amber">🚶</div>
+        <div class="stat-info">
+          <h3>ตรวจพบการเคลื่อนไหว</h3>
+          <div id="stat-moving" class="value">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon red">🚨</div>
+        <div class="stat-info">
+          <h3>ออกนอกรั้วบ้าน (Alert)</h3>
+          <div id="stat-outside" class="value" style="color: var(--danger);">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Layout: Sidebar & Detail Panel -->
+    <div class="dashboard-layout">
+
+      <!-- Left Sidebar: Device Directory -->
+      <aside class="sidebar-card">
+        <div class="sidebar-header">
+          <div class="sidebar-header-top">
+            <h2>🛰️ รายการอุปกรณ์ (<span id="devices-count-label">0</span>)</h2>
+          </div>
+
+          <!-- Search Input -->
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="device-search-input" class="search-input" placeholder="ค้นหารหัสเครื่อง, ชื่อผู้ป่วย...">
+          </div>
+
+          <!-- Filter Pills -->
+          <div class="filter-pills">
+            <button class="filter-pill active" data-filter="all">ทั้งหมด</button>
+            <button class="filter-pill" data-filter="STATIONARY">🟢 อยู่นิ่ง</button>
+            <button class="filter-pill" data-filter="MOVING">🟡 เคลื่อนไหว</button>
+            <button class="filter-pill" data-filter="OUTSIDE">🔴 นอกรั้ว</button>
+          </div>
+        </div>
+
+        <!-- Scrollable Device List -->
+        <div id="devices-list" class="device-list">
+          <!-- Device items will be generated by JavaScript -->
+          <div style="text-align: center; padding: 40px 10px; color: var(--slate-600); font-size: 13px;">
+            กำลังโหลดข้อมูลอุปกรณ์...
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right Main Panel: Detail & Map -->
+      <section class="detail-panel">
+
+        <!-- Selected Device Banner -->
+        <div class="device-banner">
+          <div class="banner-title-area">
+            <div id="banner-avatar" class="patient-avatar">👤</div>
+            <div class="banner-text">
+              <h2>
+                <span id="banner-device-id">TRACKER_01</span>
+                <span id="banner-mode-badge" class="badge-mode stationary">🟢 อยู่นิ่ง</span>
+                <span id="banner-mute-badge" class="badge-mode" style="background: #e2e8f0; color: #475569; display: none;">🔕 พักระบบ</span>
+              </h2>
+              <p id="banner-patient-desc">คุณตาสมชาย • สายรัดแขนข้อมือซ้าย</p>
+            </div>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="banner-actions">
+            <button id="btn-toggle-mute" class="btn btn-outline btn-sm">
+              🔕 พักระบบชั่วคราว
+            </button>
+            <button id="btn-toggle-buzzer" class="btn btn-outline btn-sm">
+              🔊 เสียง Buzzer: เปิด
+            </button>
+            <button id="btn-test-line" class="btn btn-outline btn-sm" style="border-color: #10b981; color: #059669;">
+              💬 ส่งแจ้งเตือน LINE
+            </button>
+            <button id="btn-edit-device" class="btn btn-outline btn-sm">
+              ✏️ แก้ไขข้อมูล
+            </button>
+            <button id="btn-delete-device" class="btn btn-danger btn-sm">
+              🗑️ ลบ
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Map Card -->
+        <div class="map-card">
+          <div class="map-header">
+            <h3>🗺️ แผนที่พิกัดสดและแนวรั้วบ้าน (Live Tracker & Geofence Map)</h3>
+            <div class="map-tools">
+              <button id="btn-fit-bounds" class="btn btn-outline btn-sm">
+                🔍 ซูมพิกัดเครื่องนี้
+              </button>
+              <button id="btn-fit-all" class="btn btn-outline btn-sm">
+                🌐 ดูทุกเครื่องพร้อมกัน
+              </button>
+            </div>
+          </div>
+
+          <!-- Leaflet Map Container -->
+          <div id="live-map"></div>
+
+          <!-- Map Legend -->
+          <div class="map-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--success);"></div>
+              <span>อยู่นิ่งตามปกติ (Stationary)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--warning);"></div>
+              <span>กำลังเคลื่อนไหว (Moving)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--danger);"></div>
+              <span>ออกนอกแนวรั้วบ้าน (Outside Alert)</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: #3b82f6; border-radius: 0; width: 14px; height: 3px;"></div>
+              <span>แนวรั้วปลอดภัย Geofence</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Information Tabs Card -->
+        <div class="tabs-card">
+          <div class="tabs-nav">
+            <button class="tab-btn active" data-tab="tab-patient">
+              👤 ข้อมูลผู้สวมใส่ & ฮาร์ดแวร์
+            </button>
+            <button class="tab-btn" data-tab="tab-caregivers">
+              👥 ผู้ดูแลที่ผูกไว้ (<span id="caregiver-count-pill">0</span>)
+            </button>
+            <button class="tab-btn" data-tab="tab-fence">
+              🏡 แนวรั้วความปลอดภัย Geofence
+            </button>
+            <button class="tab-btn" data-tab="tab-logs">
+              📜 ประวัติพิกัดย้อนหลัง (Telemetry Logs)
+            </button>
+          </div>
+
+          <!-- Tab 1: Patient & Hardware -->
+          <div id="tab-patient" class="tab-content active">
+            <div class="info-grid">
+              <div class="info-box">
+                <div class="info-box-title">👤 ข้อมูลผู้ป่วย / ผู้สวมใส่</div>
+                <div class="info-item">
+                  <span class="info-label">ชื่อ-นามสกุล:</span>
+                  <span id="info-patient-name" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ตำแหน่งสวมใส่:</span>
+                  <span id="info-wearer-pos" class="info-value">-</span>
+                </div>
+                <div class="info-item" style="flex-direction: column; gap: 4px;">
+                  <span class="info-label">อาการ / หมายเหตุ:</span>
+                  <span id="info-patient-note" class="info-value" style="text-align: left; font-weight: normal; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--slate-200);">-</span>
+                </div>
+              </div>
+
+              <div class="info-box">
+                <div class="info-box-title">🛰️ สถานะเรียลไทม์ (Live Telemetry)</div>
+                <div class="info-item">
+                  <span class="info-label">พิกัดปัจจุบัน:</span>
+                  <span id="info-current-coords" class="info-value" style="font-family: monospace;">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ความเร็ว:</span>
+                  <span id="info-current-speed" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ระดับแบตเตอรี่:</span>
+                  <span id="info-current-battery" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ระยะห่างจากบ้าน:</span>
+                  <span id="info-current-distance" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">อัปเดตล่าสุด:</span>
+                  <span id="info-last-update" class="info-value">-</span>
+                </div>
+              </div>
+
+              <div class="info-box">
+                <div class="info-box-title">⚙️ สเปกฮาร์ดแวร์ & เครือข่าย</div>
+                <div class="info-item">
+                  <span class="info-label">ไมโครคอนโทรลเลอร์:</span>
+                  <span id="info-hw-board" class="info-value">RP2350 NB-IoT</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ชิปโมเด็ม & GNSS:</span>
+                  <span id="info-hw-gnss" class="info-value">ST87M01-1301</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ซิมการ์ด:</span>
+                  <span id="info-hw-sim" class="info-value">1NCE IoT SIM (500MB)</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">เวอร์ชันเฟิร์มแวร์:</span>
+                  <span id="info-hw-fw" class="info-value">v1.2.0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Caregivers -->
+          <div id="tab-caregivers" class="tab-content">
+            <div id="caregivers-container" class="caregivers-grid">
+              <!-- Caregiver Cards will be loaded dynamically -->
+            </div>
+          </div>
+
+          <!-- Tab 3: Geofence Info -->
+          <div id="tab-fence" class="tab-content">
+            <div class="info-grid">
+              <div class="info-box">
+                <div class="info-box-title">🏡 พิกัดจุดศูนย์กลางบ้าน</div>
+                <div class="info-item">
+                  <span class="info-label">ละติจูด (Lat):</span>
+                  <span id="fence-center-lat" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">ลองจิจูด (Lng):</span>
+                  <span id="fence-center-lng" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">รัศมีความปลอดภัย:</span>
+                  <span id="fence-radius" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">รูปแบบแนวรั้ว:</span>
+                  <span id="fence-type" class="info-value">-</span>
+                </div>
+              </div>
+
+              <div class="info-box">
+                <div class="info-box-title">🔊 การตั้งค่า Buzzer สายรัดแขน</div>
+                <div class="info-item">
+                  <span class="info-label">สถานะการทำงาน:</span>
+                  <span id="fence-buzzer-status" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">จังหวะเสียงเตือน:</span>
+                  <span id="fence-buzzer-interval" class="info-value">ทุก 500 ms</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">การพักระบบ (Mute):</span>
+                  <span id="fence-mute-status" class="info-value">ไม่ได้พักระบบ</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Telemetry Logs -->
+          <div id="tab-logs" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <span style="font-size: 13px; color: var(--slate-600);">แสดงบันทึกพิกัดล่าสุดที่อุปกรณ์ส่งเข้ามา</span>
+              <button id="btn-export-logs" class="btn btn-outline btn-sm">
+                📥 ดาวน์โหลด CSV
+              </button>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>วัน-เวลา</th>
+                    <th>โหมดตรวจจับ</th>
+                    <th>พิกัด (Lat, Lng)</th>
+                    <th>ความเร็ว (กม./ชม.)</th>
+                    <th>ห่างจากบ้าน (ม.)</th>
+                    <th>แบตเตอรี่</th>
+                  </tr>
+                </thead>
+                <tbody id="logs-tbody">
+                  <!-- Populated by JavaScript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- Modal 1: เพิ่ม / แก้ไข Tracker -->
+  <div id="modal-device" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-device-title">➕ เพิ่ม Tracker ใหม่</h3>
+        <button class="modal-close" onclick="closeModal('modal-device')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-device">
+          <input type="hidden" id="form-is-edit" value="false">
+
+          <div class="form-group">
+            <label for="input-device-id">รหัสประจำเครื่อง (Device ID) *</label>
+            <input type="text" id="input-device-id" class="form-control" placeholder="เช่น TRACKER_04" required>
+          </div>
+
+          <div class="form-group">
+            <label for="input-patient-name">ชื่อผู้สวมใส่ / ผู้ป่วย *</label>
+            <input type="text" id="input-patient-name" class="form-control" placeholder="เช่น คุณตาสมศักดิ์ มีสุข" required>
+          </div>
+
+          <div class="form-group">
+            <label for="input-wearer-pos">ตำแหน่งสวมใส่อุปกรณ์</label>
+            <input type="text" id="input-wearer-pos" class="form-control" placeholder="เช่น สายรัดข้อมือซ้าย, จี้ห้อยคอ" value="สายรัดข้อมือ">
+          </div>
+
+          <div class="form-group">
+            <label for="input-patient-note">อาการ / ประวัติ / หมายเหตุ</label>
+            <textarea id="input-patient-note" class="form-control" rows="2" placeholder="เช่น ผู้ป่วยอัลไซเมอร์ระยะแรก มักเดินหลง"></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label for="input-home-lat">พิกัดบ้าน (Latitude)</label>
+              <input type="number" step="0.000001" id="input-home-lat" class="form-control" value="13.756331">
+            </div>
+            <div class="form-group">
+              <label for="input-home-lng">พิกัดบ้าน (Longitude)</label>
+              <input type="number" step="0.000001" id="input-home-lng" class="form-control" value="100.501765">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-home-radius">รัศมีความปลอดภัย (เมตร)</label>
+            <input type="number" id="input-home-radius" class="form-control" value="50">
+          </div>
+
+          <div class="form-group">
+            <label for="input-caregiver-name">ชื่อผู้ดูแลหลัก</label>
+            <input type="text" id="input-caregiver-name" class="form-control" placeholder="เช่น คุณวิภา (ลูกสาว)">
+          </div>
+
+          <div class="form-group">
+            <label for="input-caregiver-uid">LINE User ID ของผู้ดูแล (ขึ้นต้นด้วย U...)</label>
+            <input type="text" id="input-caregiver-uid" class="form-control" placeholder="U1664630158334b37fcdac10318ee0d4e">
+          </div>
+
+          <div class="form-group">
+            <label for="input-caregiver-phone">เบอร์โทรศัพท์ติดต่อ</label>
+            <input type="text" id="input-caregiver-phone" class="form-control" placeholder="081-xxx-xxxx">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-device')">ยกเลิก</button>
+        <button id="btn-save-device" class="btn btn-primary">บันทึกข้อมูล</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: จำลองส่งพิกัด GPS (Simulator) -->
+  <div id="modal-sim" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>🧪 ทดสอบจำลองส่งพิกัด GPS (GPS Telemetry Simulator)</h3>
+        <button class="modal-close" onclick="closeModal('modal-sim')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--slate-600); margin-bottom: 14px;">
+          เลือกโหมดการทำงานจำลองเพื่อทดสอบการตอบสนองของระบบและเงื่อนไขการแจ้งเตือน LINE สำหรับ Tracker ที่เลือก
+        </p>
+
+        <div class="sim-mode-grid">
+          <div class="sim-mode-card selected" data-sim-mode="STATIONARY">
+            <div class="icon">🏠</div>
+            <div class="title">1. อยู่นิ่งในบ้าน</div>
+            <div style="font-size: 11px; color: var(--slate-600); margin-top: 2px;">ส่งทุก 2 ชม.</div>
+          </div>
+
+          <div class="sim-mode-card" data-sim-mode="MOVING">
+            <div class="icon">🚶</div>
+            <div class="title">2. มีการเคลื่อนไหว</div>
+            <div style="font-size: 11px; color: var(--slate-600); margin-top: 2px;">ส่งทุก 2 นาที</div>
+          </div>
+
+          <div class="sim-mode-card" data-sim-mode="OUTSIDE">
+            <div class="icon">🚨</div>
+            <div class="title">3. ออกนอกเขตบ้าน</div>
+            <div style="font-size: 11px; color: var(--slate-600); margin-top: 2px;">ส่งทุก 30 วินาที</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>อุปกรณ์เป้าหมาย</label>
+          <input type="text" id="sim-target-device" class="form-control" readonly style="background: var(--slate-100); font-weight: 600;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label>ความเร็วจำลอง (กม./ชม.)</label>
+            <input type="number" step="0.1" id="sim-speed" class="form-control" value="0.0">
+          </div>
+          <div class="form-group">
+            <label>ระดับแบตเตอรี่ (%)</label>
+            <input type="number" id="sim-battery" class="form-control" value="95">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-sim')">ยกเลิก</button>
+        <button id="btn-run-simulation" class="btn btn-primary" style="background: #2563eb;">
+          🚀 ยิงสัญญาณพิกัดจำลองทันที
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Message -->
+  <div id="toast">
+    <span id="toast-icon">ℹ️</span>
+    <span id="toast-message">ข้อความ</span>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    // -------------------------------------------------------------------------
+    // App State
+    // -------------------------------------------------------------------------
+    let API_BASE = window.location.origin;
+    if (window.location.protocol === 'file:') {
+      API_BASE = 'http://localhost:3000';
+    }
+
+    let devicesState = {};
+    let selectedDeviceId = null;
+    let map = null;
+    let markersLayer = null;
+    let fenceLayer = null;
+    let trailLayer = null;
+    let refreshIntervalTimer = null;
+    let isServerLive = false;
+
+    // Fallback Mock Data สำหรับกรณีเปิดไฟล์ตรง หรือเซิร์ฟเวอร์ยังไม่ได้รัน
+    const mockDevices = {
+      "TRACKER_01": {
+        deviceId: "TRACKER_01",
+        patientName: "คุณตาสมชาย",
+        note: "ผู้ป่วยอัลไซเมอร์ สวมสายรัดแขนข้อมือซ้าย",
+        wearerPosition: "สายรัดแขนข้อมือซ้าย",
+        hardware: {
+          board: "iLabs Challenger+ RP2350 NB-IoT",
+          gnss: "ST87M01-1301 Concurrent GNSS",
+          sim: "1NCE IoT SIM (APN: iot.1nce.net)",
+          fwVersion: "v1.2.0"
+        },
+        buzzer: { enabled: true, beepIntervalMs: 500 },
+        homeFence: {
+          type: "polygon",
+          centerLat: 13.756331,
+          centerLng: 100.501765,
+          radiusMeters: 50,
+          polygon: [
+            [13.75650, 100.50160],
+            [13.75655, 100.50200],
+            [13.75615, 100.50205],
+            [13.75610, 100.50165]
+          ]
+        },
+        caregivers: [
+          { userId: "U1664630158334b37fcdac10318ee0d4e", name: "ลูกสาว (ผู้ดูแลหลัก)", phone: "081-xxx-xxxx", isPrimary: true },
+          { userId: "U8af540fcc48dcc553f87d88aed55bab4", name: "ลูกชาย (ผู้ดูแลสำรอง)", phone: "089-xxx-xxxx", isPrimary: false }
+        ],
+        status: {
+          currentMode: "STATIONARY",
+          isAlertMuted: false,
+          lastLat: 13.756331,
+          lastLng: 100.501765,
+          lastSpeed: 0.0,
+          battery: 98,
+          distanceFromHome: 8,
+          isOnline: true,
+          lastUpdate: "2026-10-29T09:55:00Z"
+        },
+        history: [
+          { timestamp: new Date(Date.now() - 3600000).toISOString(), lat: 13.756331, lng: 100.501765, speed: 0, battery: 98, mode: "STATIONARY", distanceHome: 8 },
+          { timestamp: new Date(Date.now() - 7200000).toISOString(), lat: 13.756335, lng: 100.501760, speed: 0, battery: 98, mode: "STATIONARY", distanceHome: 7 }
+        ]
+      }
+    };
+
+    // -------------------------------------------------------------------------
+    // Init Leaflet Map
+    // -------------------------------------------------------------------------
+    function initMap() {
+      map = L.map('live-map').setView([13.756331, 100.501765], 16);
+
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      });
+
+      const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri World Imagery',
+        maxZoom: 19
+      });
+
+      osmLayer.addTo(map);
+
+      L.control.layers({
+        "แผนที่ถนน (Street Map)": osmLayer,
+        "ภาพถ่ายดาวเทียม (Satellite)": satelliteLayer
+      }, null, { position: 'topright' }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+      fenceLayer = L.layerGroup().addTo(map);
+      trailLayer = L.layerGroup().addTo(map);
+    }
+
+    // -------------------------------------------------------------------------
+    // Toast Notification Utility
+    // -------------------------------------------------------------------------
+    function showToast(message, icon = 'ℹ️') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-icon').textContent = icon;
+      document.getElementById('toast-message').textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3500);
+    }
+
+    // -------------------------------------------------------------------------
+    // Fetch Data from Server
+    // -------------------------------------------------------------------------
+    async function fetchDevicesData() {
+      try {
+        const response = await fetch(`${API_BASE}/api/devices`, { cache: 'no-cache' });
+        if (!response.ok) throw new Error('Network error');
+        const data = await response.json();
+        devicesState = data;
+        isServerLive = true;
+        updateConnectionBadge(true);
+      } catch (err) {
+        console.warn('Cannot connect to backend server, using cached/mock devices data:', err);
+        if (Object.keys(devicesState).length === 0) {
+          devicesState = JSON.parse(JSON.stringify(mockDevices));
+        }
+        isServerLive = false;
+        updateConnectionBadge(false);
+      }
+
+      renderStats();
+      renderDeviceList();
+
+      if (!selectedDeviceId || !devicesState[selectedDeviceId]) {
+        const keys = Object.keys(devicesState);
+        if (keys.length > 0) {
+          selectDevice(keys[0]);
+        }
+      } else {
+        renderSelectedDevice();
+      }
+    }
+
+    function updateConnectionBadge(live) {
+      const dot = document.getElementById('conn-dot');
+      const text = document.getElementById('conn-text');
+      if (live) {
+        dot.className = 'status-dot online';
+        text.textContent = 'เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย (Live)';
+      } else {
+        dot.className = 'status-dot';
+        text.textContent = 'โหมด Standalone (จำลอง)';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Render Top KPI Stats
+    // -------------------------------------------------------------------------
+    function renderStats() {
+      const allDevs = Object.values(devicesState);
+      const total = allDevs.length;
+      let stationary = 0;
+      let moving = 0;
+      let outside = 0;
+
+      allDevs.forEach(d => {
+        const mode = d.status?.currentMode || 'STATIONARY';
+        if (mode === 'OUTSIDE') outside++;
+        else if (mode === 'MOVING') moving++;
+        else stationary++;
+      });
+
+      document.getElementById('stat-total-devices').textContent = total;
+      document.getElementById('stat-stationary').textContent = stationary;
+      document.getElementById('stat-moving').textContent = moving;
+      document.getElementById('stat-outside').textContent = outside;
+      document.getElementById('devices-count-label').textContent = total;
+    }
+
+    // -------------------------------------------------------------------------
+    // Render Device List Sidebar
+    // -------------------------------------------------------------------------
+    function renderDeviceList() {
+      const container = document.getElementById('devices-list');
+      const searchTerm = document.getElementById('device-search-input').value.trim().toLowerCase();
+      const activeFilter = document.querySelector('.filter-pill.active').dataset.filter;
+
+      const items = [];
+      for (const [id, dev] of Object.entries(devicesState)) {
+        const name = (dev.patientName || '').toLowerCase();
+        const devIdLower = id.toLowerCase();
+        const mode = dev.status?.currentMode || 'STATIONARY';
+
+        // Search Match
+        if (searchTerm && !name.includes(searchTerm) && !devIdLower.includes(searchTerm)) {
+          continue;
+        }
+
+        // Filter Match
+        if (activeFilter !== 'all' && mode !== activeFilter) {
+          continue;
+        }
+
+        items.push(dev);
+      }
+
+      if (items.length === 0) {
+        container.innerHTML = `<div style="text-align: center; padding: 40px 10px; color: var(--slate-600); font-size: 13px;">ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไข</div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(dev => {
+        const id = dev.deviceId;
+        const isSelected = id === selectedDeviceId;
+        const mode = dev.status?.currentMode || 'STATIONARY';
+        const battery = dev.status?.battery !== undefined ? dev.status.battery : 100;
+        const speed = dev.status?.lastSpeed !== undefined ? dev.status.lastSpeed.toFixed(1) : '0.0';
+        const dist = dev.status?.distanceFromHome !== undefined ? dev.status.distanceFromHome : 0;
+
+        let badgeClass = 'stationary';
+        let badgeText = '🟢 อยู่นิ่ง';
+        if (mode === 'OUTSIDE') {
+          badgeClass = 'outside';
+          badgeText = '🔴 นอกบ้าน';
+        } else if (mode === 'MOVING') {
+          badgeClass = 'moving';
+          badgeText = '🟡 เคลื่อนไหว';
+        }
+
+        let batteryColor = '#10b981';
+        if (battery <= 20) batteryColor = '#ef4444';
+        else if (battery <= 50) batteryColor = '#f59e0b';
+
+        return `
+          <div class="device-item ${isSelected ? 'selected' : ''}" onclick="selectDevice('${id}')">
+            <div class="device-item-top">
+              <span class="device-id-tag">🏷️ ${id}</span>
+              <span class="badge-mode ${badgeClass}">${badgeText}</span>
+            </div>
+            <div class="device-patient-name">${escapeHtml(dev.patientName || 'ผู้สวมใส่')}</div>
+            <div style="font-size: 12px; color: var(--slate-600); display: flex; align-items: center; gap: 8px;">
+              <span>📍 ห่างบ้าน: ${dist} ม.</span>
+              <span>⚡ ${speed} km/h</span>
+            </div>
+            <div class="device-meta-row">
+              <span class="battery-bar-wrap" style="color: ${batteryColor};">
+                🔋 ${battery}%
+              </span>
+              <span>${timeAgo(dev.status?.lastUpdate)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // -------------------------------------------------------------------------
+    // Select Device & Load Full Details
+    // -------------------------------------------------------------------------
+    function selectDevice(deviceId) {
+      selectedDeviceId = deviceId;
+      renderDeviceList();
+      renderSelectedDevice();
+    }
+
+    function renderSelectedDevice() {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+
+      const st = dev.status || {};
+      const mode = st.currentMode || 'STATIONARY';
+      const battery = st.battery !== undefined ? st.battery : 100;
+      const speed = st.lastSpeed !== undefined ? st.lastSpeed.toFixed(1) : '0.0';
+      const dist = st.distanceFromHome !== undefined ? st.distanceFromHome : 0;
+      const lat = st.lastLat || 13.756331;
+      const lng = st.lastLng || 100.501765;
+
+      // Banner Updates
+      document.getElementById('banner-device-id').textContent = dev.deviceId;
+      document.getElementById('banner-patient-desc').textContent = `${dev.patientName} • ${dev.wearerPosition || 'สายรัดข้อมือ'}`;
+
+      const avatar = document.getElementById('banner-avatar');
+      avatar.textContent = (dev.patientName || 'ผ')[0];
+
+      const modeBadge = document.getElementById('banner-mode-badge');
+      if (mode === 'OUTSIDE') {
+        modeBadge.className = 'badge-mode outside';
+        modeBadge.textContent = '🚨 ออกนอกรั้วบ้าน (ALERT)';
+      } else if (mode === 'MOVING') {
+        modeBadge.className = 'badge-mode moving';
+        modeBadge.textContent = '🚶 ตรวจพบการเคลื่อนไหว';
+      } else {
+        modeBadge.className = 'badge-mode stationary';
+        modeBadge.textContent = '🏠 อยู่นิ่งภายในบ้าน';
+      }
+
+      const muteBadge = document.getElementById('banner-mute-badge');
+      const isMuted = st.isAlertMuted || false;
+      muteBadge.style.display = isMuted ? 'inline-flex' : 'none';
+
+      // Action Button Labels
+      const muteBtn = document.getElementById('btn-toggle-mute');
+      muteBtn.textContent = isMuted ? '🔔 ยกเลิกพักระบบ' : '🔕 พักระบบชั่วคราว';
+
+      const buzzerBtn = document.getElementById('btn-toggle-buzzer');
+      const buzzerEnabled = dev.buzzer?.enabled !== false;
+      buzzerBtn.textContent = buzzerEnabled ? '🔊 เสียง Buzzer: เปิด' : '🔇 เสียง Buzzer: ปิด';
+
+      // Tab 1 Info
+      document.getElementById('info-patient-name').textContent = dev.patientName || '-';
+      document.getElementById('info-wearer-pos').textContent = dev.wearerPosition || '-';
+      document.getElementById('info-patient-note').textContent = dev.note || 'ไม่มีระบุ';
+      document.getElementById('info-current-coords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      document.getElementById('info-current-speed').textContent = `${speed} กม./ชม.`;
+      document.getElementById('info-current-battery').textContent = `${battery}%`;
+      document.getElementById('info-current-distance').textContent = `${dist} เมตร`;
+      document.getElementById('info-last-update').textContent = formatThaiDate(st.lastUpdate);
+
+      // Hardware Specs
+      const hw = dev.hardware || {};
+      document.getElementById('info-hw-board').textContent = hw.board || 'RP2350 NB-IoT';
+      document.getElementById('info-hw-gnss').textContent = hw.gnss || 'ST87M01-1301';
+      document.getElementById('info-hw-sim').textContent = hw.sim || '1NCE IoT SIM';
+      document.getElementById('info-hw-fw').textContent = hw.fwVersion || 'v1.2.0';
+
+      // Tab 2 Caregivers
+      const cgList = dev.caregivers || [];
+      document.getElementById('caregiver-count-pill').textContent = cgList.length;
+      const cgContainer = document.getElementById('caregivers-container');
+      if (cgList.length === 0) {
+        cgContainer.innerHTML = `<div style="grid-column: 1/-1; padding: 20px; color: var(--slate-600); text-align: center;">ยังไม่มีผู้ดูแลผูกกับอุปกรณ์นี้</div>`;
+      } else {
+        cgContainer.innerHTML = cgList.map((cg, idx) => `
+          <div class="caregiver-card ${cg.isPrimary ? 'primary' : ''}">
+            <span class="caregiver-badge ${cg.isPrimary ? 'primary' : 'secondary'}">
+              ${cg.isPrimary ? '⭐ ผู้ดูแลหลัก' : '👤 ผู้ดูแลสำรอง'}
+            </span>
+            <div class="caregiver-name">${escapeHtml(cg.name || 'ผู้ดูแล')}</div>
+            <div class="caregiver-phone">📞 โทร: <a href="tel:${cg.phone || ''}" style="color: var(--primary); text-decoration: none; font-weight: 600;">${cg.phone || '-'}</a></div>
+            <div class="uid-box">
+              <span>LINE UID: ${cg.userId ? cg.userId.substring(0, 16) + '...' : '-'}</span>
+              <button onclick="copyToClipboard('${cg.userId || ''}')" class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 10px;">คัดลอก</button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Tab 3 Fence Info
+      const fence = dev.homeFence || {};
+      document.getElementById('fence-center-lat').textContent = fence.centerLat ? fence.centerLat.toFixed(6) : (fence.polygon?.[0]?.[0]?.toFixed(6) || '-');
+      document.getElementById('fence-center-lng').textContent = fence.centerLng ? fence.centerLng.toFixed(6) : (fence.polygon?.[0]?.[1]?.toFixed(6) || '-');
+      document.getElementById('fence-radius').textContent = `${fence.radiusMeters || 50} เมตร`;
+      document.getElementById('fence-type').textContent = fence.type === 'polygon' ? `โพลีกอน (${fence.polygon?.length || 0} มุม)` : 'วงกลมรัศมี (Circle)';
+      document.getElementById('fence-buzzer-status').textContent = buzzerEnabled ? '✅ เปิดใช้งานพร้อมเตือนภัย' : '❌ ปิดใช้งาน';
+      document.getElementById('fence-mute-status').textContent = isMuted ? '🔕 พักระบบอยู่ (ไม่ส่งเตือน 30s)' : '🔔 พร้อมเตือนภัยทันที';
+
+      // Tab 4 Logs
+      renderLogsTable(dev);
+
+      // Render Map
+      updateMapDisplay(dev);
+    }
+
+    // -------------------------------------------------------------------------
+    // Render Logs Table
+    // -------------------------------------------------------------------------
+    function renderLogsTable(dev) {
+      const tbody = document.getElementById('logs-tbody');
+      const history = dev.history || dev.recentHistory || [];
+
+      if (history.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--slate-600); padding: 24px;">ยังไม่มีประวัติการส่งพิกัด</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = history.map(rec => {
+        let badgeColor = '#10b981';
+        let badgeText = 'อยู่นิ่ง (2 ชม.)';
+        if (rec.mode === 'OUTSIDE') {
+          badgeColor = '#ef4444';
+          badgeText = 'ออกนอกเขต (30 วิ)';
+        } else if (rec.mode === 'MOVING') {
+          badgeColor = '#f59e0b';
+          badgeText = 'เคลื่อนไหว (2 นาที)';
+        }
+
+        return `
+          <tr>
+            <td>${formatThaiDate(rec.timestamp)}</td>
+            <td><span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${badgeColor}; margin-right: 6px;"></span>${badgeText}</td>
+            <td style="font-family: monospace;">${rec.lat?.toFixed(6)}, ${rec.lng?.toFixed(6)}</td>
+            <td>${rec.speed !== undefined ? rec.speed.toFixed(1) : '0.0'}</td>
+            <td>${rec.distanceHome !== undefined ? rec.distanceHome : '-'} ม.</td>
+            <td>🔋 ${rec.battery !== undefined ? rec.battery + '%' : '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // -------------------------------------------------------------------------
+    // Update Map with Selected Device & Geofence
+    // -------------------------------------------------------------------------
+    function updateMapDisplay(selectedDev) {
+      if (!map) return;
+
+      markersLayer.clearLayers();
+      fenceLayer.clearLayers();
+      trailLayer.clearLayers();
+
+      const st = selectedDev.status || {};
+      const currentLat = st.lastLat || 13.756331;
+      const currentLng = st.lastLng || 100.501765;
+      const currentMode = st.currentMode || 'STATIONARY';
+
+      // 1. วาดแนวรั้ว Geofence ของเครื่องที่เลือก
+      const fence = selectedDev.homeFence || {};
+      if (fence.type === 'polygon' && fence.polygon && fence.polygon.length >= 3) {
+        L.polygon(fence.polygon, {
+          color: '#2563eb',
+          weight: 2,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.15,
+          dashArray: '4, 4'
+        }).addTo(fenceLayer).bindPopup(`<b>แนวรั้วบ้านโพลีกอน (${selectedDev.patientName})</b>`);
+      } else {
+        const centerLat = fence.centerLat || currentLat;
+        const centerLng = fence.centerLng || currentLng;
+        const radius = fence.radiusMeters || 50;
+        L.circle([centerLat, centerLng], {
+          radius: radius,
+          color: '#2563eb',
+          weight: 2,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.15,
+          dashArray: '4, 4'
+        }).addTo(fenceLayer).bindPopup(`<b>แนวรั้วบ้าน รัศมี ${radius} ม. (${selectedDev.patientName})</b>`);
+      }
+
+      // 2. วาดเส้นทางย้อนหลัง (Trail)
+      const history = selectedDev.history || selectedDev.recentHistory || [];
+      if (history.length > 1) {
+        const trailPoints = history.map(h => [h.lat, h.lng]);
+        L.polyline(trailPoints, {
+          color: '#f97316',
+          weight: 3,
+          opacity: 0.7,
+          dashArray: '5, 8'
+        }).addTo(trailLayer);
+      }
+
+      // 3. วาดหมุด Tracker ตัวอื่น ๆ ทั้งหมดก่อน (ขนาดเล็กกว่า)
+      for (const [id, dev] of Object.entries(devicesState)) {
+        if (id === selectedDeviceId) continue;
+        const devSt = dev.status || {};
+        const devLat = devSt.lastLat;
+        const devLng = devSt.lastLng;
+        if (!devLat || !devLng) continue;
+
+        let dotColor = '#10b981';
+        if (devSt.currentMode === 'OUTSIDE') dotColor = '#ef4444';
+        else if (devSt.currentMode === 'MOVING') dotColor = '#f59e0b';
+
+        const otherIcon = L.divIcon({
+          className: 'other-marker',
+          html: `<div style="background: ${dotColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7]
+        });
+
+        L.marker([devLat, devLng], { icon: otherIcon })
+          .addTo(markersLayer)
+          .bindPopup(`<b>${dev.deviceId}</b>: ${dev.patientName}<br>โหมด: ${devSt.currentMode}`)
+          .on('click', () => selectDevice(id));
+      }
+
+      // 4. วาดหมุด Tracker ที่ถูกเลือก (Highlight ใหญ่ + Pulse)
+      let mainColor = '#10b981';
+      let pulseAnim = '';
+      if (currentMode === 'OUTSIDE') {
+        mainColor = '#ef4444';
+        pulseAnim = 'animation: pulse-danger 1.5s infinite;';
+      } else if (currentMode === 'MOVING') {
+        mainColor = '#f59e0b';
+      }
+
+      const selectedIcon = L.divIcon({
+        className: 'selected-marker',
+        html: `
+          <div style="position: relative; width: 36px; height: 36px;">
+            <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: ${mainColor}; opacity: 0.25; ${pulseAnim}"></div>
+            <div style="position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: ${mainColor}; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px;">📍</div>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
+      });
+
+      L.marker([currentLat, currentLng], { icon: selectedIcon })
+        .addTo(markersLayer)
+        .bindPopup(`
+          <div style="font-size: 13px; line-height: 1.5;">
+            <b>🏷️ ${selectedDev.deviceId}</b><br>
+            👤 ผู้ป่วย: <b>${selectedDev.patientName}</b><br>
+            📍 พิกัด: ${currentLat.toFixed(6)}, ${currentLng.toFixed(6)}<br>
+            ⚡ ความเร็ว: ${st.lastSpeed || 0} km/h<br>
+            🔋 แบตเตอรี่: ${st.battery || 100}%<br>
+            📏 ห่างจากบ้าน: ${st.distanceFromHome || 0} ม.
+          </div>
+        `).openPopup();
+
+      map.setView([currentLat, currentLng], 16);
+    }
+
+    // -------------------------------------------------------------------------
+    // Actions: Mute / Buzzer / Test LINE / Simulation / Add / Edit / Delete
+    // -------------------------------------------------------------------------
+    document.getElementById('btn-toggle-mute').addEventListener('click', async () => {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+      const targetMute = !(dev.status?.isAlertMuted);
+
+      try {
+        if (isServerLive) {
+          const res = await fetch(`${API_BASE}/api/devices/${selectedDeviceId}/mute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isMuted: targetMute })
+          });
+          const json = await res.json();
+          dev.status.isAlertMuted = json.isAlertMuted;
+        } else {
+          dev.status.isAlertMuted = targetMute;
+        }
+        showToast(targetMute ? 'พักระบบการเตือนชั่วคราวเรียบร้อย' : 'ปลดล็อกการเตือนภัยแล้ว', '🔕');
+        renderSelectedDevice();
+      } catch (e) {
+        showToast('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ', '❌');
+      }
+    });
+
+    document.getElementById('btn-toggle-buzzer').addEventListener('click', async () => {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+      const targetState = !(dev.buzzer?.enabled);
+
+      try {
+        if (isServerLive) {
+          const res = await fetch(`${API_BASE}/api/devices/${selectedDeviceId}/buzzer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: targetState })
+          });
+          const json = await res.json();
+          dev.buzzer.enabled = json.buzzerEnabled;
+        } else {
+          dev.buzzer = dev.buzzer || {};
+          dev.buzzer.enabled = targetState;
+        }
+        showToast(targetState ? 'เปิดเสียง Buzzer บนสายรัดแขนแล้ว' : 'ปิดเสียง Buzzer แล้ว', '🔊');
+        renderSelectedDevice();
+      } catch (e) {
+        showToast('เกิดข้อผิดพลาดในการสั่งงาน Buzzer', '❌');
+      }
+    });
+
+    document.getElementById('btn-test-line').addEventListener('click', async () => {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+
+      showToast(`กำลังส่งแจ้งเตือน LINE สำหรับ ${dev.deviceId}...`, '💬');
+      try {
+        if (isServerLive) {
+          const res = await fetch(`${API_BASE}/api/devices/${selectedDeviceId}/test-line`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: dev.status?.currentMode || 'OUTSIDE' })
+          });
+          const json = await res.json();
+          if (json.sent) {
+            showToast('ส่งข้อความเข้า LINE ผู้ดูแลสำเร็จ!', '✅');
+          } else {
+            showToast('ส่งไม่สำเร็จ: ตรวจสอบ LINE Token หรือ UID ผู้ดูแล', '⚠️');
+          }
+        } else {
+          setTimeout(() => {
+            showToast('จำลอง: ส่ง Flex Message เข้า LINE สำเร็จ (Demo Mode)', '✅');
+          }, 800);
+        }
+      } catch (e) {
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', '❌');
+      }
+    });
+
+    // Delete Device
+    document.getElementById('btn-delete-device').addEventListener('click', async () => {
+      if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบ Tracker ${selectedDeviceId} ออกจากระบบ?`)) return;
+
+      try {
+        if (isServerLive) {
+          await fetch(`${API_BASE}/api/devices/${selectedDeviceId}`, { method: 'DELETE' });
+        }
+        delete devicesState[selectedDeviceId];
+        showToast(`ลบอุปกรณ์ ${selectedDeviceId} เรียบร้อยแล้ว`, '🗑️');
+        fetchDevicesData();
+      } catch (e) {
+        showToast('ไม่สามารถลบอุปกรณ์ได้', '❌');
+      }
+    });
+
+    // Simulation Modal
+    document.getElementById('btn-open-sim').addEventListener('click', () => {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+      document.getElementById('sim-target-device').value = `${dev.deviceId} (${dev.patientName})`;
+      openModal('modal-sim');
+    });
+
+    document.querySelectorAll('.sim-mode-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.sim-mode-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        const mode = card.dataset.simMode;
+        if (mode === 'STATIONARY') {
+          document.getElementById('sim-speed').value = '0.0';
+        } else if (mode === 'MOVING') {
+          document.getElementById('sim-speed').value = '2.5';
+        } else if (mode === 'OUTSIDE') {
+          document.getElementById('sim-speed').value = '4.0';
+        }
+      });
+    });
+
+    document.getElementById('btn-run-simulation').addEventListener('click', async () => {
+      const mode = document.querySelector('.sim-mode-card.selected').dataset.simMode;
+      const speed = parseFloat(document.getElementById('sim-speed').value) || 0;
+      const battery = parseInt(document.getElementById('sim-battery').value) || 90;
+
+      closeModal('modal-sim');
+      showToast(`กำลังส่งพิกัดจำลอง (${mode})...`, '🚀');
+
+      try {
+        if (isServerLive) {
+          const res = await fetch(`${API_BASE}/api/devices/${selectedDeviceId}/simulate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode, speed, battery })
+          });
+          const json = await res.json();
+          showToast(`จำลองสำเร็จ: โหมด ${json.detectedMode} (ห่างบ้าน ${json.distanceFromHome}ม.)`, '✅');
+          await fetchDevicesData();
+        } else {
+          // Local fallback simulation
+          const dev = devicesState[selectedDeviceId];
+          const fence = dev.homeFence || {};
+          let lat = fence.centerLat || 13.756331;
+          let lng = fence.centerLng || 100.501765;
+          let dist = 10;
+          if (mode === 'OUTSIDE') {
+            lat += 0.0030;
+            lng += 0.0030;
+            dist = 280;
+          } else if (mode === 'MOVING') {
+            lat += 0.0002;
+            lng += 0.0002;
+            dist = 25;
+          }
+
+          dev.status = {
+            ...dev.status,
+            currentMode: mode,
+            lastLat: lat,
+            lastLng: lng,
+            lastSpeed: speed,
+            battery,
+            distanceFromHome: dist,
+            lastUpdate: new Date().toISOString()
+          };
+
+          dev.history = dev.history || [];
+          dev.history.unshift({
+            timestamp: new Date().toISOString(),
+            lat,
+            lng,
+            speed,
+            battery,
+            mode,
+            distanceHome: dist
+          });
+
+          showToast(`จำลองสำเร็จ (Demo): ตรวจจับโหมด ${mode}`, '✅');
+          renderStats();
+          renderDeviceList();
+          renderSelectedDevice();
+        }
+      } catch (e) {
+        showToast('เกิดข้อผิดพลาดในการจำลองสัญญาณ', '❌');
+      }
+    });
+
+    // Add / Edit Device Modal
+    document.getElementById('btn-open-add-device').addEventListener('click', () => {
+      document.getElementById('modal-device-title').textContent = '➕ เพิ่ม Tracker ใหม่';
+      document.getElementById('form-is-edit').value = 'false';
+      document.getElementById('input-device-id').readOnly = false;
+      document.getElementById('input-device-id').value = `TRACKER_0${Object.keys(devicesState).length + 1}`;
+      document.getElementById('input-patient-name').value = '';
+      document.getElementById('input-wearer-pos').value = 'สายรัดข้อมือ';
+      document.getElementById('input-patient-note').value = '';
+      document.getElementById('input-home-lat').value = '13.756331';
+      document.getElementById('input-home-lng').value = '100.501765';
+      document.getElementById('input-home-radius').value = '50';
+      document.getElementById('input-caregiver-name').value = '';
+      document.getElementById('input-caregiver-uid').value = '';
+      document.getElementById('input-caregiver-phone').value = '';
+      openModal('modal-device');
+    });
+
+    document.getElementById('btn-edit-device').addEventListener('click', () => {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+
+      document.getElementById('modal-device-title').textContent = `✏️ แก้ไขข้อมูล ${dev.deviceId}`;
+      document.getElementById('form-is-edit').value = 'true';
+      document.getElementById('input-device-id').value = dev.deviceId;
+      document.getElementById('input-device-id').readOnly = true;
+      document.getElementById('input-patient-name').value = dev.patientName || '';
+      document.getElementById('input-wearer-pos').value = dev.wearerPosition || '';
+      document.getElementById('input-patient-note').value = dev.note || '';
+
+      const fence = dev.homeFence || {};
+      document.getElementById('input-home-lat').value = fence.centerLat || '13.756331';
+      document.getElementById('input-home-lng').value = fence.centerLng || '100.501765';
+      document.getElementById('input-home-radius').value = fence.radiusMeters || '50';
+
+      const primaryCg = (dev.caregivers && dev.caregivers[0]) || {};
+      document.getElementById('input-caregiver-name').value = primaryCg.name || '';
+      document.getElementById('input-caregiver-uid').value = primaryCg.userId || '';
+      document.getElementById('input-caregiver-phone').value = primaryCg.phone || '';
+
+      openModal('modal-device');
+    });
+
+    document.getElementById('btn-save-device').addEventListener('click', async () => {
+      const isEdit = document.getElementById('form-is-edit').value === 'true';
+      const deviceId = document.getElementById('input-device-id').value.trim();
+      const patientName = document.getElementById('input-patient-name').value.trim();
+      const wearerPos = document.getElementById('input-wearer-pos').value.trim();
+      const note = document.getElementById('input-patient-note').value.trim();
+      const lat = parseFloat(document.getElementById('input-home-lat').value) || 13.756331;
+      const lng = parseFloat(document.getElementById('input-home-lng').value) || 100.501765;
+      const radius = parseFloat(document.getElementById('input-home-radius').value) || 50;
+      const cgName = document.getElementById('input-caregiver-name').value.trim();
+      const cgUid = document.getElementById('input-caregiver-uid').value.trim();
+      const cgPhone = document.getElementById('input-caregiver-phone').value.trim();
+
+      if (!deviceId || !patientName) {
+        alert('กรุณากรอกรหัสเครื่องและชื่อผู้ป่วย');
+        return;
+      }
+
+      const caregivers = [];
+      if (cgName || cgUid) {
+        caregivers.push({
+          userId: cgUid,
+          name: cgName || 'ผู้ดูแลหลัก',
+          phone: cgPhone,
+          isPrimary: true
+        });
+      }
+
+      const payload = {
+        deviceId,
+        patientName,
+        wearerPosition: wearerPos,
+        note,
+        homeFence: {
+          type: 'circle',
+          centerLat: lat,
+          centerLng: lng,
+          radiusMeters: radius,
+          polygon: []
+        },
+        caregivers
+      };
+
+      try {
+        if (isServerLive) {
+          const url = isEdit ? `${API_BASE}/api/devices/${deviceId}` : `${API_BASE}/api/devices`;
+          const method = isEdit ? 'PUT' : 'POST';
+          await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          devicesState[deviceId] = {
+            ...devicesState[deviceId],
+            ...payload,
+            status: devicesState[deviceId]?.status || {
+              currentMode: 'STATIONARY',
+              isAlertMuted: false,
+              lastLat: lat,
+              lastLng: lng,
+              lastSpeed: 0,
+              battery: 100,
+              distanceFromHome: 0,
+              isOnline: true,
+              lastUpdate: new Date().toISOString()
+            }
+          };
+        }
+
+        closeModal('modal-device');
+        showToast(isEdit ? 'บันทึกการแก้ไขเรียบร้อย' : 'เพิ่ม Tracker ใหม่สำเร็จ!', '✅');
+        selectedDeviceId = deviceId;
+        await fetchDevicesData();
+      } catch (e) {
+        showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', '❌');
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Tabs Navigation
+    // -------------------------------------------------------------------------
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Filter Pills & Search Input Events
+    // -------------------------------------------------------------------------
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        renderDeviceList();
+      });
+    });
+
+    document.getElementById('device-search-input').addEventListener('input', () => {
+      renderDeviceList();
+    });
+
+    // Map Controls
+    document.getElementById('btn-fit-bounds').addEventListener('click', () => {
+      const dev = devicesState[selectedDeviceId];
+      if (dev && map) {
+        const lat = dev.status?.lastLat || 13.756331;
+        const lng = dev.status?.lastLng || 100.501765;
+        map.flyTo([lat, lng], 17);
+      }
+    });
+
+    document.getElementById('btn-fit-all').addEventListener('click', () => {
+      if (!map) return;
+      const points = [];
+      Object.values(devicesState).forEach(d => {
+        if (d.status?.lastLat && d.status?.lastLng) {
+          points.push([d.status.lastLat, d.status.lastLng]);
+        }
+      });
+      if (points.length > 0) {
+        map.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
+      }
+    });
+
+    // Export Logs CSV
+    document.getElementById('btn-export-logs').addEventListener('click', () => {
+      const dev = devicesState[selectedDeviceId];
+      if (!dev) return;
+      const history = dev.history || dev.recentHistory || [];
+      if (history.length === 0) {
+        alert('ไม่มีข้อมูลบันทึกสำหรับดาวน์โหลด');
+        return;
+      }
+
+      let csv = "Timestamp,Mode,Latitude,Longitude,Speed_kmh,Distance_Home_m,Battery_pct\n";
+      history.forEach(h => {
+        csv += `"${h.timestamp}","${h.mode}",${h.lat},${h.lng},${h.speed || 0},${h.distanceHome || 0},${h.battery || 0}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${selectedDeviceId}_telemetry_logs.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    // Manual Refresh
+    document.getElementById('btn-manual-refresh').addEventListener('click', () => {
+      fetchDevicesData();
+      showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', '🔄');
+    });
+
+    // Auto Refresh Setting
+    document.getElementById('auto-refresh-select').addEventListener('change', (e) => {
+      const val = parseInt(e.target.value);
+      if (refreshIntervalTimer) clearInterval(refreshIntervalTimer);
+      if (val > 0) {
+        refreshIntervalTimer = setInterval(fetchDevicesData, val);
+        showToast(`ตั้งเวลารีเฟรชอัตโนมัติ: ทุก ${val / 1000} วินาที`, '⏱️');
+      } else {
+        showToast('ปิดการรีเฟรชอัตโนมัติแล้ว', '⏸️');
+      }
+    });
+
+    // Modal Helpers
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    // Utility Helpers
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function copyToClipboard(text) {
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('คัดลอกรหัส User ID แล้ว!', '📋');
+      });
+    }
+
+    function formatThaiDate(isoString) {
+      if (!isoString) return '-';
+      const d = new Date(isoString);
+      if (isNaN(d)) return '-';
+      return new Intl.DateTimeFormat('th-TH', {
+        dateStyle: 'short',
+        timeStyle: 'medium',
+        hour12: false
+      }).format(d);
+    }
+
+    function timeAgo(isoString) {
+      if (!isoString) return '-';
+      const d = new Date(isoString);
+      const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (diffSec < 60) return `${diffSec} วินาทีที่แล้ว`;
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)} นาทีที่แล้ว`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ชม. ที่แล้ว`;
+      return `${Math.floor(diffSec / 86400)} วันที่แล้ว`;
+    }
+
+    // -------------------------------------------------------------------------
+    // App Initialization
+    // -------------------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      fetchDevicesData();
+
+      // เริ่ม Auto-refresh เริ่มต้นทุก 5 วินาที
+      refreshIntervalTimer = setInterval(fetchDevicesData, 5000);
+    });
+  </script>
+</body>
+
+</html>
+
