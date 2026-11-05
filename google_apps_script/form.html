@@ -520,9 +520,15 @@
 
     // 4. โหลดข้อมูลเดิมที่เคยบันทึกไว้ขึ้นมาแสดงอัตโนมัติเมื่อเปิดหน้าเว็บ (แยกตาม userId รายบุคคล)
     window.addEventListener('DOMContentLoaded', function () {
-      // ดึง userId จาก URL parameter
+      // ดึง userId จาก Google Apps Script template หรือ URL parameter
+      let templateUserId = "";
+      try {
+        const raw = "<?= (typeof userId !== 'undefined') ? userId : '' ?>";
+        if (!raw.includes('<%') && !raw.includes('<?=')) templateUserId = raw;
+      } catch(e) {}
+
       const urlParams = new URLSearchParams(window.location.search);
-      const urlUserId = urlParams.get('userId') || '';
+      const urlUserId = templateUserId || urlParams.get('userId') || '';
       const urlDeviceId = urlParams.get('deviceId') || '';
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {

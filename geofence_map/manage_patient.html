@@ -457,19 +457,35 @@
 
     // 4. โหลดข้อมูลเดิมที่เคยบันทึกไว้ขึ้นมาแสดงอัตโนมัติเมื่อเปิดหน้าเว็บ
     window.addEventListener('DOMContentLoaded', function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlUserId = urlParams.get('userId') || '';
+      const urlDeviceId = urlParams.get('deviceId') || '';
+
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function (data) {
             if (data) populateFormData(data);
           })
-          .getPatientData();
+          .getPatientData(urlDeviceId, urlUserId);
       } else {
-        const saved = localStorage.getItem('saved_tracker_TRACKER_01');
-        if (saved) {
-          try {
-            populateFormData(JSON.parse(saved));
-          } catch (e) { }
-        }
+        // ดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์หลังบ้าน
+        fetch('/api/devices')
+          .then(res => res.json())
+          .then(devs => {
+            const target = (urlDeviceId && devs[urlDeviceId]) ? devs[urlDeviceId] : Object.values(devs)[0];
+            if (target) {
+              populateFormData(target);
+            } else {
+              const saved = localStorage.getItem('saved_tracker_TRACKER_01');
+              if (saved) populateFormData(JSON.parse(saved));
+            }
+          })
+          .catch(() => {
+            const saved = localStorage.getItem('saved_tracker_TRACKER_01');
+            if (saved) {
+              try { populateFormData(JSON.parse(saved)); } catch (e) { }
+            }
+          });
       }
     });
 

@@ -1,8 +1,8 @@
 {
   "TRACKER_01": {
     "deviceId": "TRACKER_01",
-    "patientName": "คุณตาสมชาย",
-    "note": "ผู้ป่วยอัลไซเมอร์ สวมสายรัดแขนข้อมือซ้าย",
+    "patientName": "คุณตาศูนย์หนึ่ง",
+    "note": "ชอบปีนรั้้วบ้านออกไปหาแฟนเก่าตอนกลางคืน",
     "wearerPosition": "สายรัดแขนข้อมือซ้าย",
     "hardware": {
       "board": "iLabs Challenger+ RP2350 NB-IoT",
@@ -11,33 +11,40 @@
       "fwVersion": "v1.2.0"
     },
     "buzzer": {
-      "enabled": true,
-      "beepIntervalMs": 500
+      "enabled": true
     },
     "homeFence": {
-      "type": "polygon",
-      "centerLat": 13.756331,
-      "centerLng": 100.501765,
-      "radiusMeters": 50,
       "polygon": [
-        [13.7565, 100.5016],
-        [13.75655, 100.502],
-        [13.75615, 100.50205],
-        [13.7561, 100.50165]
-      ]
+        [
+          13.752017921528235,
+          100.48911294390565
+        ],
+        [
+          13.749183316207487,
+          100.48954209734804
+        ],
+        [
+          13.74655710712623,
+          100.49078664233096
+        ],
+        [
+          13.747432513425602,
+          100.49426278521425
+        ],
+        [
+          13.752017921528235,
+          100.49366197039491
+        ]
+      ],
+      "centerLat": 13.749441755963158,
+      "centerLng": 100.49147328783877,
+      "type": "polygon"
     },
     "caregivers": [
       {
+        "phone": "0838963360",
         "userId": "U1664630158334b37fcdac10318ee0d4e",
-        "name": "ลูกสาว (ผู้ดูแลหลัก)",
-        "phone": "081-xxx-xxxx",
-        "isPrimary": true
-      },
-      {
-        "userId": "U8af540fcc48dcc553f87d88aed55bab4",
-        "name": "ลูกชาย (ผู้ดูแลสำรอง)",
-        "phone": "089-xxx-xxxx",
-        "isPrimary": false
+        "name": "ลูฟร์"
       }
     ],
     "status": {
@@ -50,6 +57,130 @@
       "distanceFromHome": 8,
       "isOnline": true,
       "lastUpdate": "2026-10-29T09:55:00Z"
+    }
+  },
+  "TRACKER_69": {
+    "deviceId": "TRACKER_69",
+    "patientName": "คุณเฉาก๊วย",
+    "note": "ผู้ป่วยอัลไซเมอร์ สวมสายรัดแขนข้อมือซ้าย",
+    "wearerPosition": "สายรัดแขนข้อมือซ้าย",
+    "hardware": {
+      "board": "iLabs Challenger+ RP2350 NB-IoT",
+      "gnss": "ST87M01-1301 Concurrent GNSS",
+      "sim": "1NCE IoT SIM (APN: iot.1nce.net)",
+      "fwVersion": "v1.2.0"
+    },
+    "buzzer": {
+      "enabled": true
+    },
+    "homeFence": {
+      "polygon": [
+        [
+          13.756995368886123,
+          100.50153493881227
+        ],
+        [
+          13.757068316283561,
+          100.50174415111542
+        ],
+        [
+          13.757078737338484,
+          100.50199627876283
+        ],
+        [
+          13.756802579226306,
+          100.50222158432008
+        ],
+        [
+          13.756510789168807,
+          100.5021893978119
+        ],
+        [
+          13.75628673584203,
+          100.50178170204164
+        ],
+        [
+          13.756521210248563,
+          100.50155103206636
+        ]
+      ],
+      "centerLat": 13.756751962427696,
+      "centerLng": 100.50185986927579,
+      "type": "polygon"
+    },
+    "caregivers": [
+      {
+        "name": "เพิร์ธ",
+        "phone": "0918861013",
+        "userId": "Udc61ee07185bce1dd4b5efd899e60d76"
+      }
+    ],
+    "status": {
+      "currentMode": "STATIONARY",
+      "isAlertMuted": false,
+      "lastLat": 13.756751962427696,
+      "lastLng": 100.50185986927579,
+      "lastSpeed": 0,
+      "battery": 100,
+      "distanceFromHome": 0,
+      "isOnline": true,
+      "lastUpdate": "2026-11-05T14:08:40.876066Z"
+    }
+  },
+  "TRACKER_67": {
+    "deviceId": "TRACKER_67",
+    "patientName": "คุณคะน้า",
+    "note": "ผู้ป่วยอัลไซเมอร์ สวมสายรัดแขนข้อมือซ้าย",
+    "wearerPosition": "สายรัดแขนข้อมือซ้าย",
+    "hardware": {
+      "board": "iLabs Challenger+ RP2350 NB-IoT",
+      "gnss": "ST87M01-1301 Concurrent GNSS",
+      "sim": "1NCE IoT SIM (APN: iot.1nce.net)",
+      "fwVersion": "v1.2.0"
+    },
+    "buzzer": {
+      "enabled": true
+    },
+    "homeFence": {
+      "polygon": [
+        [
+          13.745070942593735,
+          100.49098753936052
+        ],
+        [
+          13.745008413050384,
+          100.49086415774583
+        ],
+        [
+          13.744745267705882,
+          100.4910197258687
+        ],
+        [
+          13.744799981118684,
+          100.49114578969238
+        ]
+      ],
+      "centerLat": 13.74490615111717,
+      "centerLng": 100.49100430316686,
+      "type": "polygon"
+    },
+    "caregivers": [
+      {
+        "userId": "U8af540fcc48dcc553f87d88aed55bab4",
+        "name": "ตีตี้",
+        "phone": "0648720910"
+      }
+    ],
+    "status": {
+      "currentMode": "STATIONARY",
+      "isAlertMuted": false,
+      "lastLat": 13.74490615111717,
+      "lastLng": 100.49100430316686,
+      "lastSpeed": 0,
+      "battery": 100,
+      "distanceFromHome": 0,
+      "isOnline": true,
+      "lastUpdate": "2026-11-05T14:08:40.876124Z"
     }
   }
 }

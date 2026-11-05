@@ -80,7 +80,11 @@ $ServerProc = Start-Process -FilePath $RuntimeExe -ArgumentList $ScriptToRun -Wo
 Start-Sleep -Seconds 2
 
 Write-Host "[INFO] Opening Admin Dashboard: $AdminUrl" -ForegroundColor Cyan
-Start-Process $AdminUrl
+try {
+    Start-Process $AdminUrl
+} catch {
+    Start-Process "cmd.exe" "/c start $AdminUrl" -WindowStyle Hidden
+}
 
 Write-Host ""
 Write-Host "[SUCCESS] Admin System is now RUNNING at $AdminUrl" -ForegroundColor Green

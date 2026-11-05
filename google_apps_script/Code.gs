@@ -37,19 +37,38 @@ const DEFAULT_PATIENT_DATA = {
   ]
 };
 
-// 1. ส่งหน้าเว็บฟอร์มเมื่อมีคนเปิดลิงก์ (GET Request)
-// รับ ?userId=Uxxx เพื่อแยกข้อมูลรายบุคคล
+// 1. ส่งหน้าเว็บฟอร์มเมื่อมีคนเปิดลิงก์ หรือส่งข้อมูล API ให้ระบบหลังบ้าน
 function doGet(e) {
-  return HtmlService.createHtmlOutputFromFile('form')
+  // 1.1 API สำหรับส่งข้อมูลอุปกรณ์ทั้งหมดให้หลังบ้าน (Admin Dashboard & Backend Server)
+  if (e && e.parameter && (e.parameter.api === 'getDevices' || e.parameter.api === 'devices')) {
+    const allDevices = getAllDevicesData();
+    return ContentService.createTextOutput(JSON.stringify(allDevices))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 1.2 ส่งหน้าเว็บฟอร์มลงทะเบียนเมื่อมีคนเปิดลิงก์ (รับ ?userId=Uxxx เพื่อแยกข้อมูลรายบุคคล)
+  const userId = (e && e.parameter && e.parameter.userId) ? e.parameter.userId : '';
+  const template = HtmlService.createTemplateFromFile('form');
+  template.userId = userId;
+  return template.evaluate()
     .setTitle('ลงทะเบียนผู้ป่วยและเครื่อง GPS')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
 }
 
-// 2. เมื่อมีข้อความส่งเข้ามาใน LINE (POST Request / Webhook)
+// 2. เมื่อมีข้อความส่งเข้ามาใน LINE (POST Request / Webhook) หรือ API บันทึกข้อมูลจากหลังบ้าน
 function doPost(e) {
   try {
     const contents = JSON.parse(e.postData.contents);
+
+    // 2.1 กรณีระบบหลังบ้าน / Admin Dashboard ส่งข้อมูลมาบันทึกหรืออัปเดตลงคลาวด์
+    if (contents && contents.action === 'saveDevice' && contents.device) {
+      const saveRes = savePatientData(contents.device);
+      return ContentService.createTextOutput(JSON.stringify(saveRes))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2.2 กรณี LINE OA Webhook ส่ง Event เข้ามา
     const events = contents.events;
 
     for (let i = 0; i < events.length; i++) {
@@ -320,6 +339,29 @@ function getPatientData(deviceId, userId) {
     caregivers: [],
     homeFence: { polygon: [] }
   };
+}
+
+// ดึงข้อมูลอุปกรณ์ทั้งหมดที่มีในระบบ เพื่อส่งออกเป็น JSON ให้เว็บหลังบ้าน / Admin Dashboard
+function getAllDevicesData() {
+  const props = PropertiesService.getScriptProperties();
+  const allProps = props.getProperties();
+  const result = {};
+
+  for (const key in allProps) {
+    if (key.indexOf('device_') === 0) {
+      const dId = key.substring(7);
+      try {
+        result[dId] = JSON.parse(allProps[key]);
+      } catch (err) {}
+    }
+  }
+
+  // หากใน PropertiesService ยังไม่มี ให้ใส่ข้อมูลเริ่มต้น
+  if (Object.keys(result).length === 0) {
+    result[DEFAULT_PATIENT_DATA.deviceId || 'TRACKER_01'] = DEFAULT_PATIENT_DATA;
+  }
+
+  return result;
 }
 
 // ส่งข้อความตอบกลับไปยัง LINE Messaging API

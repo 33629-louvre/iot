@@ -83,6 +83,115 @@ function saveDevicesData(data) {
 let devices = loadDevicesData();
 
 // -----------------------------------------------------------------------------
+// ระบบเชื่อมต่อและซิงค์ข้อมูลกับหน้าบ้าน (Google Apps Script & LINE OA)
+// -----------------------------------------------------------------------------
+
+// ซิงค์ข้อมูลผู้ป่วยและเครื่องที่ผู้ดูแลกรอกผ่านหน้าบ้าน (Google Apps Script / LINE OA)
+async function syncDevicesFromGAS() {
+  if (!FORM_URL) {
+    console.warn('[SYNC] ข้ามการซิงค์: ยังไม่ได้ระบุ FORM_URL ใน .env');
+    return { success: false, error: 'FORM_URL not configured' };
+  }
+
+  try {
+    const cleanUrl = FORM_URL.split('?')[0];
+    const syncApiUrl = `${cleanUrl}?api=getDevices`;
+    console.log(`[SYNC] กำลังดึงข้อมูลจากหน้าบ้าน (Google Apps Script): ${syncApiUrl}`);
+
+    const res = await axios.get(syncApiUrl, {
+      timeout: 12000,
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+      const gasDevices = res.data;
+      let count = 0;
+
+      for (const [dId, gDev] of Object.entries(gasDevices)) {
+        if (!dId || !gDev || typeof gDev !== 'object') continue;
+
+        const existing = devices[dId] || {};
+        const st = existing.status || {};
+
+        let fence = gDev.homeFence || existing.homeFence || {
+          type: 'polygon',
+          centerLat: defaultHomeConfig.latitude,
+          centerLng: defaultHomeConfig.longitude,
+          radiusMeters: defaultHomeConfig.radiusMeters,
+          polygon: []
+        };
+
+        // คำนวณจุดกึ่งกลางจาก Polygon ถ้ามี
+        if (fence.polygon && fence.polygon.length >= 3) {
+          const cLat = fence.polygon.reduce((acc, p) => acc + p[0], 0) / fence.polygon.length;
+          const cLng = fence.polygon.reduce((acc, p) => acc + p[1], 0) / fence.polygon.length;
+          fence.centerLat = cLat;
+          fence.centerLng = cLng;
+          fence.type = 'polygon';
+        }
+
+        devices[dId] = {
+          ...existing,
+          deviceId: dId,
+          patientName: gDev.patientName || existing.patientName || `ผู้ป่วย (${dId})`,
+          note: gDev.note !== undefined ? gDev.note : (existing.note || ''),
+          wearerPosition: gDev.wearerPosition || existing.wearerPosition || 'สายรัดแขนข้อมือซ้าย',
+          hardware: existing.hardware || {
+            board: 'iLabs Challenger+ RP2350 NB-IoT',
+            gnss: 'ST87M01-1301 Concurrent GNSS',
+            sim: '1NCE IoT SIM (APN: iot.1nce.net)',
+            fwVersion: 'v1.2.0'
+          },
+          buzzer: gDev.buzzer || existing.buzzer || { enabled: true, beepIntervalMs: 500 },
+          homeFence: fence,
+          caregivers: gDev.caregivers || existing.caregivers || [],
+          status: {
+            ...st,
+            currentMode: st.currentMode || 'STATIONARY',
+            isAlertMuted: st.isAlertMuted || false,
+            lastLat: st.lastLat || fence.centerLat || defaultHomeConfig.latitude,
+            lastLng: st.lastLng || fence.centerLng || defaultHomeConfig.longitude,
+            lastSpeed: st.lastSpeed || 0,
+            battery: st.battery || 100,
+            distanceFromHome: st.distanceFromHome || 0,
+            isOnline: st.isOnline !== undefined ? st.isOnline : true,
+            lastUpdate: st.lastUpdate || new Date().toISOString()
+          }
+        };
+        count++;
+      }
+
+      saveDevicesData(devices);
+      console.log(`[SYNC] ✅ ซิงค์ข้อมูลจาก Google Apps Script เรียบร้อยแล้ว (${count} เครื่อง)`);
+      return { success: true, count, devices };
+    } else {
+      console.warn('[SYNC] ได้รับข้อมูลในรูปแบบที่ไม่ถูกต้องจาก GAS');
+      return { success: false, error: 'Invalid response format' };
+    }
+  } catch (err) {
+    console.error('[SYNC] ข้อผิดพลาดในการซิงค์ข้อมูลกับ GAS:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// ส่งข้อมูลที่แอดมินแก้ไขในหลังบ้าน กลับไปอัปเดตบน Google Apps Script & Google Sheets
+async function pushDeviceToGAS(device) {
+  if (!FORM_URL || !device) return false;
+  try {
+    const cleanUrl = FORM_URL.split('?')[0];
+    await axios.post(cleanUrl, {
+      action: 'saveDevice',
+      device: device
+    }, { timeout: 10000 });
+    console.log(`[SYNC-PUSH] ส่งข้อมูลอุปกรณ์ ${device.deviceId} ไปยัง Google Apps Script สำเร็จ`);
+    return true;
+  } catch (err) {
+    console.warn(`[SYNC-PUSH] ไม่สามารถส่งข้อมูลอุปกรณ์ ${device.deviceId} ไปยัง GAS:`, err.message);
+    return false;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // สูตรคำนวณระยะทาง Haversine Formula (เมตร)
 // -----------------------------------------------------------------------------
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -144,6 +253,24 @@ function evaluateGeofence(device, lat, lng) {
     centerLng,
     radius
   };
+}
+
+// คำนวณและอัปเดตสถานะโหมด (STATIONARY / MOVING / OUTSIDE) อัตโนมัติจากพิกัดและแนวรั้วล่าสุด
+function recalculateDeviceMode(dev) {
+  if (!dev) return dev;
+  const fence = dev.homeFence || {};
+  const st = dev.status || {};
+  const curLat = st.lastLat || fence.centerLat || defaultHomeConfig.latitude;
+  const curLng = st.lastLng || fence.centerLng || defaultHomeConfig.longitude;
+  const geoResult = evaluateGeofence(dev, curLat, curLng);
+  const isMoving = (st.lastSpeed || 0) >= 1.5;
+  const mode = geoResult.isOutside ? 'OUTSIDE' : (isMoving ? 'MOVING' : 'STATIONARY');
+  dev.status = {
+    ...st,
+    currentMode: mode,
+    distanceFromHome: Math.round(geoResult.distanceFromCenter)
+  };
+  return dev;
 }
 
 // แปลงเวลาเป็นภาษาไทย
@@ -544,6 +671,7 @@ app.post('/api/telemetry', async (req, res) => {
 
 // 2.1 ดึงสรุปภาพรวมระบบ (Admin Dashboard KPI Summary)
 app.get('/api/admin/stats', (req, res) => {
+  Object.values(devices).forEach(d => recalculateDeviceMode(d));
   const allDevices = Object.values(devices);
   const totalDevices = allDevices.length;
   let onlineCount = 0;
@@ -582,6 +710,7 @@ app.get('/api/admin/stats', (req, res) => {
 app.get('/api/devices', (req, res) => {
   const result = {};
   for (const [id, dev] of Object.entries(devices)) {
+    recalculateDeviceMode(dev);
     result[id] = {
       ...dev,
       recentHistory: (deviceHistoryMap[id] || []).slice(0, 10)
@@ -650,6 +779,7 @@ app.post('/api/devices', (req, res) => {
 
   saveDevicesData(devices);
   console.log(`[ADMIN] เพิ่ม Tracker ใหม่สำเร็จ: ${deviceId}`);
+  pushDeviceToGAS(devices[deviceId]);
   res.status(201).json({ status: 'OK', message: 'สร้างอุปกรณ์ใหม่เรียบร้อย', device: devices[deviceId] });
 });
 
@@ -672,6 +802,7 @@ app.put('/api/devices/:id', (req, res) => {
 
   saveDevicesData(devices);
   console.log(`[ADMIN] อัปเดตข้อมูลอุปกรณ์ ${deviceId} เรียบร้อยแล้ว`);
+  pushDeviceToGAS(dev);
   res.json({ status: 'OK', message: 'อัปเดตข้อมูลสำเร็จ', device: dev });
 });
 
@@ -905,7 +1036,19 @@ app.post('/api/bind-device', (req, res) => {
   };
 
   saveDevicesData(devices);
+  pushDeviceToGAS(devices[targetId]);
   res.json({ status: 'OK', message: 'Device bound successfully', device: devices[targetId] });
+});
+
+// 2.11 ซิงค์ข้อมูลกับ Google Apps Script (ดึงข้อมูลล่าสุดจากหน้าบ้าน)
+app.get('/api/sync-gas', async (req, res) => {
+  const result = await syncDevicesFromGAS();
+  res.json(result);
+});
+
+app.post('/api/sync-gas', async (req, res) => {
+  const result = await syncDevicesFromGAS();
+  res.json(result);
 });
 
 // -----------------------------------------------------------------------------
@@ -1032,4 +1175,14 @@ app.listen(PORT, () => {
   console.log(`🗺️ ระบบจัดการผู้ป่วย (Caregiver Portal): http://localhost:${PORT}/manage`);
   console.log(`📱 โหลดอุปกรณ์แล้วทั้งหมด: ${Object.keys(devices).length} เครื่อง`);
   console.log('=============================================================');
+
+  // ดึงข้อมูลล่าสุดจากหน้าบ้าน (Google Apps Script) ทันทีที่เซิร์ฟเวอร์เริ่มทำงาน
+  setTimeout(() => {
+    syncDevicesFromGAS();
+  }, 2000);
+
+  // ตั้งเวลาซิงค์อัตโนมัติทุก 30 วินาที
+  setInterval(() => {
+    syncDevicesFromGAS();
+  }, 30000);
 });

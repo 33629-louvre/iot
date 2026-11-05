@@ -979,6 +979,10 @@
           🔄 รีเฟรช
         </button>
 
+        <button id="btn-sync-gas" class="btn btn-outline btn-sm" style="border-color: #10b981; color: #059669; font-weight: 600;" title="ดึงข้อมูลล่าสุดที่ผู้ดูแลกรอกผ่านแบบฟอร์มหน้าบ้าน (LINE OA / Google Form)">
+          ☁️ ซิงค์ข้อมูลหน้าบ้าน (LINE/Form)
+        </button>
+
         <button id="btn-open-sim" class="btn btn-outline btn-sm" style="border-color: #3b82f6; color: #2563eb;">
           🧪 ทดสอบจำลองพิกัด
         </button>
@@ -1544,6 +1548,67 @@
     }
 
     // -------------------------------------------------------------------------
+    // Helper: ตรวจสอบและคำนวณสถานะ Geofence แบบ Real-time
+    // -------------------------------------------------------------------------
+    function isPointInPoly(pt, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i][0], yi = poly[i][1];
+        const xj = poly[j][0], yj = poly[j][1];
+        const intersect = ((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function syncDeviceComputedMode(dev) {
+      if (!dev || !dev.status) return 'STATIONARY';
+      const st = dev.status;
+      const lat = st.lastLat;
+      const lng = st.lastLng;
+      const fence = dev.homeFence || {};
+
+      if (lat !== undefined && lng !== undefined) {
+        if (fence.type === 'polygon' && fence.polygon && fence.polygon.length >= 3) {
+          const poly = fence.polygon;
+          const inside = isPointInPoly([lat, lng], poly);
+          const cLat = poly.reduce((acc, p) => acc + p[0], 0) / poly.length;
+          const cLng = poly.reduce((acc, p) => acc + p[1], 0) / poly.length;
+          const dist = Math.round(calculateDistanceMeters(lat, lng, cLat, cLng));
+          st.distanceFromHome = dist;
+          if (!inside) {
+            st.currentMode = 'OUTSIDE';
+            return 'OUTSIDE';
+          }
+        } else if (fence.centerLat && fence.centerLng) {
+          const dist = Math.round(calculateDistanceMeters(lat, lng, fence.centerLat, fence.centerLng));
+          st.distanceFromHome = dist;
+          if (dist > (fence.radiusMeters || 50)) {
+            st.currentMode = 'OUTSIDE';
+            return 'OUTSIDE';
+          }
+        }
+      }
+
+      if ((st.lastSpeed || 0) >= 1.5) {
+        st.currentMode = 'MOVING';
+        return 'MOVING';
+      }
+      st.currentMode = 'STATIONARY';
+      return 'STATIONARY';
+    }
+
+    // -------------------------------------------------------------------------
     // Fetch Data from Server
     // -------------------------------------------------------------------------
     async function fetchDevicesData() {
@@ -1561,6 +1626,11 @@
         }
         isServerLive = false;
         updateConnectionBadge(false);
+      }
+
+      // ตรวจสอบและประเมินสถานะ Geofence ทุกเครื่อง
+      for (const dev of Object.values(devicesState)) {
+        syncDeviceComputedMode(dev);
       }
 
       renderStats();
@@ -2333,6 +2403,47 @@
       fetchDevicesData();
       showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', '🔄');
     });
+
+    // Sync with Google Apps Script (Frontend Form / LINE OA)
+    const GAS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwdNLK2VmcznQ9beF9dgV6tKbPZicYgBio1gJ-N4e8CYWfKlq_Y4Np72AhN1MVh7Ao3/exec';
+
+    async function triggerSyncFromFrontend() {
+      const btn = document.getElementById('btn-sync-gas');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ กำลังซิงค์...';
+      btn.disabled = true;
+
+      try {
+        if (isServerLive) {
+          const res = await fetch(`${API_BASE}/api/sync-gas`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(`ซิงค์ข้อมูลจากหน้าบ้านสำเร็จ! อัปเดต ${data.count} เครื่อง`, '✅');
+            await fetchDevicesData();
+          } else {
+            showToast(`ไม่สามารถซิงค์ได้: ${data.error || 'กรุณาลองใหม่'}`, '⚠️');
+          }
+        } else {
+          const cleanUrl = GAS_WEBAPP_URL.split('?')[0];
+          const res = await fetch(`${cleanUrl}?api=getDevices`);
+          const gasDevices = await res.json();
+          if (gasDevices && typeof gasDevices === 'object') {
+            devicesState = gasDevices;
+            renderStats();
+            renderDeviceList();
+            renderSelectedDevice();
+            showToast(`ดึงข้อมูลจากหน้าบ้านสำเร็จ (${Object.keys(gasDevices).length} เครื่อง)`, '✅');
+          }
+        }
+      } catch (err) {
+        showToast(`ข้อผิดพลาดการซิงค์: ${err.message}`, '❌');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('btn-sync-gas').addEventListener('click', triggerSyncFromFrontend);
 
     // Auto Refresh Setting
     document.getElementById('auto-refresh-select').addEventListener('change', (e) => {

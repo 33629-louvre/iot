@@ -14,7 +14,10 @@ import time
 import urllib.parse
 import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from datetime import datetime
+from datetime import datetime, timezone
+
+def get_utc_now_iso():
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 PORT = 3000
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,9 +53,11 @@ CAREGIVER_LINE_USER_ID = env_config.get('CAREGIVER_LINE_USER_ID', '')
 DEFAULT_HOME_LAT = float(env_config.get('HOME_LATITUDE', '13.756331'))
 DEFAULT_HOME_LNG = float(env_config.get('HOME_LONGITUDE', '100.501765'))
 DEFAULT_HOME_RADIUS = float(env_config.get('HOME_RADIUS_METERS', '50'))
+FORM_URL = env_config.get('FORM_URL', 'https://script.google.com/macros/s/AKfycbwdNLK2VmcznQ9beF9dgV6tKbPZicYgBio1gJ-N4e8CYWfKlq_Y4Np72AhN1MVh7Ao3/exec')
 
 print(f"[CONFIG] LINE Access Token Loaded: {'YES (Ready)' if LINE_CHANNEL_ACCESS_TOKEN else 'NO'}")
 print(f"[CONFIG] Default Caregiver LINE UID: {CAREGIVER_LINE_USER_ID}")
+print(f"[CONFIG] Form / GAS Web App URL: {FORM_URL}")
 
 # -----------------------------------------------------------------------------
 # โหลด / บันทึก Devices Data
@@ -78,6 +83,9 @@ def save_devices(data):
 devices_db = load_devices()
 device_history = {}
 
+# -----------------------------------------------------------------------------
+# สูตรคำนวณระยะทางและตรวจสอบขอบเขต Geofence
+# -----------------------------------------------------------------------------
 # Haversine distance in meters
 def calculate_distance(lat1, lon1, lat2, lon2):
     R = 6371000.0
@@ -87,7 +95,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return R * c
 
-# Point in polygon
+# Point in polygon (Ray-casting Algorithm)
 def is_point_in_polygon(point, vs):
     x, y = point[0], point[1]
     inside = False
@@ -123,6 +131,110 @@ def evaluate_geofence(dev, lat, lng):
         'isOutside': dist > radius,
         'distanceFromCenter': dist
     }
+
+# คำนวณและอัปเดตสถานะโหมด (STATIONARY / MOVING / OUTSIDE) อัตโนมัติจากพิกัดและแนวรั้วล่าสุด
+def recalculate_device_mode(dev):
+    st = dev.get('status', {})
+    fence = dev.get('homeFence', {})
+    lat = st.get('lastLat', fence.get('centerLat', DEFAULT_HOME_LAT))
+    lng = st.get('lastLng', fence.get('centerLng', DEFAULT_HOME_LNG))
+    geo = evaluate_geofence(dev, lat, lng)
+    speed = float(st.get('lastSpeed', 0.0))
+    mode = 'OUTSIDE' if geo['isOutside'] else ('MOVING' if speed >= 1.5 else 'STATIONARY')
+    st['currentMode'] = mode
+    st['distanceFromHome'] = round(geo['distanceFromCenter'])
+    dev['status'] = st
+    return dev
+
+# ตรวจสอบและอัปเดตโหมดของอุปกรณ์ทั้งหมดตอนเริ่มระบบ
+for dev in devices_db.values():
+    recalculate_device_mode(dev)
+
+# -----------------------------------------------------------------------------
+# ซิงค์ข้อมูลกับ Google Apps Script (หน้าบ้าน)
+# -----------------------------------------------------------------------------
+def sync_devices_from_gas():
+    if not FORM_URL:
+        return {'success': False, 'error': 'FORM_URL not set'}
+    try:
+        clean_url = FORM_URL.split('?')[0]
+        sync_api_url = f"{clean_url}?api=getDevices"
+        print(f"[SYNC] กำลังดึงข้อมูลจาก Google Apps Script: {sync_api_url}")
+        req = urllib.request.Request(sync_api_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=12) as response:
+            content = response.read().decode('utf-8')
+            gas_devices = json.loads(content)
+
+            if isinstance(gas_devices, dict):
+                count = 0
+                for d_id, g_dev in gas_devices.items():
+                    if not d_id or not isinstance(g_dev, dict):
+                        continue
+                    existing = devices_db.get(d_id, {})
+                    st = existing.get('status', {})
+                    fence = g_dev.get('homeFence', existing.get('homeFence', {
+                        'type': 'polygon',
+                        'centerLat': DEFAULT_HOME_LAT,
+                        'centerLng': DEFAULT_HOME_LNG,
+                        'radiusMeters': DEFAULT_HOME_RADIUS,
+                        'polygon': []
+                    }))
+                    if fence.get('polygon') and len(fence['polygon']) >= 3:
+                        poly = fence['polygon']
+                        fence['centerLat'] = sum(p[0] for p in poly) / len(poly)
+                        fence['centerLng'] = sum(p[1] for p in poly) / len(poly)
+                        fence['type'] = 'polygon'
+
+                    dev_obj = {
+                        **existing,
+                        'deviceId': d_id,
+                        'patientName': g_dev.get('patientName', existing.get('patientName', f'ผู้ป่วย ({d_id})')),
+                        'note': g_dev.get('note', existing.get('note', '')),
+                        'wearerPosition': g_dev.get('wearerPosition', existing.get('wearerPosition', 'สายรัดแขนข้อมือซ้าย')),
+                        'hardware': existing.get('hardware', {
+                            'board': 'iLabs Challenger+ RP2350 NB-IoT',
+                            'gnss': 'ST87M01-1301 Concurrent GNSS',
+                            'sim': '1NCE IoT SIM (APN: iot.1nce.net)',
+                            'fwVersion': 'v1.2.0'
+                        }),
+                        'buzzer': g_dev.get('buzzer', existing.get('buzzer', {'enabled': True, 'beepIntervalMs': 500})),
+                        'homeFence': fence,
+                        'caregivers': g_dev.get('caregivers', existing.get('caregivers', [])),
+                        'status': {
+                            **st,
+                            'isAlertMuted': st.get('isAlertMuted', False),
+                            'lastLat': st.get('lastLat', fence.get('centerLat', DEFAULT_HOME_LAT)),
+                            'lastLng': st.get('lastLng', fence.get('centerLng', DEFAULT_HOME_LNG)),
+                            'lastSpeed': st.get('lastSpeed', 0),
+                            'battery': st.get('battery', 100),
+                            'isOnline': st.get('isOnline', True),
+                            'lastUpdate': st.get('lastUpdate', get_utc_now_iso())
+                        }
+                    }
+                    recalculate_device_mode(dev_obj)
+                    devices_db[d_id] = dev_obj
+                    count += 1
+                save_devices(devices_db)
+                print(f"[SYNC] ✅ ซิงค์ข้อมูลสำเร็จ ({count} เครื่อง)")
+                return {'success': True, 'count': count, 'devices': devices_db}
+    except Exception as e:
+        print(f"[SYNC] ข้อผิดพลาดในการซิงค์ข้อมูลกับ GAS: {e}")
+        return {'success': False, 'error': str(e)}
+    return {'success': False, 'error': 'Unknown sync error'}
+
+def push_device_to_gas(device):
+    if not FORM_URL or not device:
+        return False
+    try:
+        clean_url = FORM_URL.split('?')[0]
+        payload = json.dumps({'action': 'saveDevice', 'device': device}, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(clean_url, data=payload, headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"[SYNC-PUSH] ส่งข้อมูลอุปกรณ์ {device.get('deviceId')} ไปยัง Google Apps Script สำเร็จ")
+            return True
+    except Exception as e:
+        print(f"[SYNC-PUSH] ไม่สามารถส่งข้อมูลอุปกรณ์ไปยัง GAS: {e}")
+        return False
 
 # -----------------------------------------------------------------------------
 # ส่ง LINE OA Push / Multicast Notification
@@ -304,6 +416,8 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
 
         # 1. API: /api/admin/stats
         if path == '/api/admin/stats':
+            for dev in devices_db.values():
+                recalculate_device_mode(dev)
             all_devs = list(devices_db.values())
             outside = sum(1 for d in all_devs if d.get('status', {}).get('currentMode') == 'OUTSIDE')
             moving = sum(1 for d in all_devs if d.get('status', {}).get('currentMode') == 'MOVING')
@@ -318,10 +432,17 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        # 1.1 API: /api/sync-gas
+        if path == '/api/sync-gas':
+            result = sync_devices_from_gas()
+            self.send_json(result)
+            return
+
         # 2. API: /api/devices
         if path == '/api/devices':
             res = {}
             for dev_id, dev in devices_db.items():
+                recalculate_device_mode(dev)
                 d_copy = dict(dev)
                 d_copy['recentHistory'] = device_history.get(dev_id, [])[:10]
                 res[dev_id] = d_copy
@@ -383,6 +504,12 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
         path = parsed.path
         body = self.read_json_body()
 
+        # Sync GAS
+        if path == '/api/sync-gas':
+            result = sync_devices_from_gas()
+            self.send_json(result)
+            return
+
         # Telemetry
         if path == '/api/telemetry':
             dev_id = body.get('deviceId', 'TRACKER_01')
@@ -420,13 +547,13 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
                 'battery': battery,
                 'distanceFromHome': round(geo['distanceFromCenter']),
                 'isOnline': True,
-                'lastUpdate': datetime.utcnow().isoformat() + 'Z'
+                'lastUpdate': get_utc_now_iso()
             }
 
             if dev_id not in device_history:
                 device_history[dev_id] = []
             device_history[dev_id].insert(0, {
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'timestamp': get_utc_now_iso(),
                 'lat': lat,
                 'lng': lng,
                 'speed': speed,
@@ -501,13 +628,13 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
                     'battery': battery,
                     'distanceFromHome': round(geo['distanceFromCenter']),
                     'isOnline': True,
-                    'lastUpdate': datetime.utcnow().isoformat() + 'Z'
+                    'lastUpdate': get_utc_now_iso()
                 }
 
                 if dev_id not in device_history:
                     device_history[dev_id] = []
                 device_history[dev_id].insert(0, {
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'timestamp': get_utc_now_iso(),
                     'lat': c_lat,
                     'lng': c_lng,
                     'speed': speed,
@@ -567,9 +694,10 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
                 'battery': 100,
                 'distanceFromHome': 0,
                 'isOnline': True,
-                'lastUpdate': datetime.utcnow().isoformat() + 'Z'
+                'lastUpdate': get_utc_now_iso()
             }
             save_devices(devices_db)
+            push_device_to_gas(devices_db[dev_id])
             self.send_json({'status': 'OK', 'device': devices_db[dev_id]})
             return
 
@@ -634,7 +762,7 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
                         'battery': 100,
                         'distanceFromHome': 0,
                         'isOnline': True,
-                        'lastUpdate': datetime.utcnow().isoformat() + 'Z'
+                        'lastUpdate': get_utc_now_iso()
                     }
                 }
             else:
@@ -646,6 +774,7 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
                 dev['caregivers'] = caregivers
 
             save_devices(devices_db)
+            push_device_to_gas(devices_db[dev_id])
             self.send_json({'status': 'OK', 'message': 'Device bound successfully', 'device': devices_db[dev_id]})
             return
 
@@ -659,6 +788,7 @@ class AdminRequestHandler(SimpleHTTPRequestHandler):
                 body = self.read_json_body()
                 devices_db[dev_id].update(body)
                 save_devices(devices_db)
+                push_device_to_gas(devices_db[dev_id])
                 self.send_json({'status': 'OK', 'device': devices_db[dev_id]})
                 return
         self.send_error(404, "Device not found")
@@ -713,6 +843,18 @@ def run_server():
     print(f"🗺️ หน้าเว็บลงทะเบียนผู้ป่วย (Caregiver Form): http://localhost:{PORT}/manage")
     print(f"📱 โหลดอุปกรณ์ Tracker ในระบบแล้ว {len(devices_db)} เครื่อง")
     print("=" * 65)
+
+    import threading
+    def auto_sync_worker():
+        time.sleep(2)
+        sync_devices_from_gas()
+        while True:
+            time.sleep(30)
+            sync_devices_from_gas()
+
+    sync_thread = threading.Thread(target=auto_sync_worker, daemon=True)
+    sync_thread.start()
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
